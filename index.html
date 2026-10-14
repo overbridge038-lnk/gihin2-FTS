@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>誤品照合 gohin2（別メーカー用）</title>
+<title>誤品照合 FTS版</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
 <style>
 :root{--ok:#16a34a;--ng:#dc2626;--bg:#f3f4f6;--card:#fff;--tx:#111827;--sub:#6b7280;--pri:#2563eb;}
@@ -22,10 +22,10 @@ main{padding:12px;max-width:720px;margin:0 auto}
 .step .val{font-size:20px;font-weight:700;word-break:break-all;min-height:28px}
 .step .sub{font-size:13px;color:var(--sub)}
 .guide{font-size:22px;font-weight:700;text-align:center;margin:12px 0}
-.makerBtns{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:8px 0 14px}
-.makerBtns button{padding:22px 6px;font-size:22px;font-weight:700;border-radius:12px;border:2px solid var(--pri);background:#fff;color:var(--pri)}
-.makerBtns button.on{background:var(--pri);color:#fff}
-.makerBtns button.empty{border-color:#d1d5db;color:#9ca3af;background:#f9fafb}
+.makerBtns{display:grid;grid-template-columns:1fr;gap:12px;margin:8px 0 14px}
+.makerBtns button{padding:22px 6px;font-size:24px;font-weight:700;border-radius:12px;border:4px solid transparent;color:#fff}
+.makerBtns button.on{border-color:#111827;box-shadow:0 0 0 3px #fff inset}
+.makerBtns button.empty{border-color:#d1d5db;color:#9ca3af;background:#f9fafb!important}
 .mkRow{border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;margin-top:8px;display:flex;flex-direction:column;gap:6px}
 .mkRow .mkName{font-size:16px;font-weight:700;padding:6px 8px;border:1px solid #d1d5db;border-radius:8px;width:100%;box-sizing:border-box}
 .mkRow .mkPos{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:14px}
@@ -88,7 +88,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 FTS版 <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
@@ -267,7 +267,7 @@ h2{font-size:16px;margin:4px 0 10px}
 
 <!-- 開始画面（タップで音・バイブを有効化） -->
 <div id="startCover" onclick="startWork()">
-  <div style="font-size:30px;font-weight:900">誤品照合</div>
+  <div style="font-size:30px;font-weight:900">誤品照合 FTS版</div>
   <div style="font-size:22px;margin-top:16px">画面をタップして作業開始</div>
   <div style="font-size:14px;margin-top:10px;opacity:.8">（音とバイブを有効にします）</div>
 </div>
@@ -285,8 +285,8 @@ h2{font-size:16px;margin:4px 0 10px}
 <!-- パスワード確認（設定・リセット用） -->
 <script>
 const LS = {
-  get(k, d){ try{ const v = localStorage.getItem('gohin2_'+k); return v===null? d : JSON.parse(v);}catch(e){return d;} },
-  set(k, v){ try{ localStorage.setItem('gohin2_'+k, JSON.stringify(v)); }catch(e){} }
+  get(k, d){ try{ const v = localStorage.getItem('gohin2fts_'+k); return v===null? d : JSON.parse(v);}catch(e){return d;} },
+  set(k, v){ try{ localStorage.setItem('gohin2fts_'+k, JSON.stringify(v)); }catch(e){} }
 };
 const DEFAULT_CFG = { cPs:1, cPl:150, iPs:1, iPl:150, cmp:'full', pw:'0000', mode:'scanner' };
 let cfg = Object.assign({}, DEFAULT_CFG, LS.get('cfg', {}));
@@ -495,7 +495,7 @@ let today = dayKey(), viewDay = today, dbh = null;
 // --- IndexedDB（タブレット内に大量の記録を安全に保存） ---
 function dbOpen(){
   return new Promise((res, rej)=>{
-    const r = indexedDB.open('gohin2', 1);
+    const r = indexedDB.open('gohin2fts', 1);
     r.onupgradeneeded = () => { const s = r.result.createObjectStore('logs', {keyPath:'id', autoIncrement:true}); s.createIndex('day','day'); };
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
@@ -811,7 +811,9 @@ let lastRaw = LS.get('lastRaw', {c:'', i:''});
 const clampPos = v => Math.min(150, Math.max(1, Math.round(Number(v)||1)));
 function posFromCfg(){ return { cS:cfg.cPs, cE:cfg.cPs+cfg.cPl-1, iS:cfg.iPs, iE:cfg.iPs+cfg.iPl-1 }; }
 /* ---------- よく使う客先かんばん（メーカー別の抜き取り位置） ---------- */
-const DEFAULT_MAKERS = ['トヨタ','協豊','豊鉄','FTS広田','三五','テクノエイト'];
+const DEFAULT_MAKERS = ['FTS プロテクター','FTS ポリ箱','アイシン高丘'];
+// 押し間違え防止のため、ボタンごとに色を変える（1番目：青、2番目：オレンジ、3番目：紫）
+const MAKER_COLORS = ['#2563eb','#ea580c','#7c3aed','#0d9488','#be185d','#4d7c0f'];
 function makers(){
   if(!Array.isArray(cfg.makers) || !cfg.makers.length) cfg.makers = DEFAULT_MAKERS.map(n=>({name:n, cS:null, cE:null, iS:null, iE:null}));
   return cfg.makers;
@@ -824,7 +826,7 @@ function currentMaker(){
 function renderMakerBtns(){
   const curM = currentMaker();
   document.getElementById('makerBtns').innerHTML = makers().map((m,i)=>
-    `<button type="button" class="${makerReady(m)?(curM===m?'on':''):'empty'}" onclick="applyMaker(${i})">${String(m.name).replace(/[&<>"]/g,'')}</button>`).join('');
+    `<button type="button" class="${makerReady(m)?(curM===m?'on':''):'empty'}" style="background:${MAKER_COLORS[i%MAKER_COLORS.length]}" onclick="applyMaker(${i})">${curM===m?'✓ ':''}${String(m.name).replace(/[&<>"]/g,'')}</button>`).join('');
 }
 function applyMaker(i){
   const m = makers()[i];
@@ -836,7 +838,7 @@ function applyMaker(i){
 function renderMakerTbl(){
   document.getElementById('makerTbl').innerHTML = makers().map((m,i)=>{
     const v = x => (x==null ? '' : x);
-    return `<div class="mkRow">
+    return `<div class="mkRow" style="border-left:8px solid ${MAKER_COLORS[i%MAKER_COLORS.length]}">
       <input class="mkName" id="mkN${i}" value="${String(m.name).replace(/"/g,'&quot;')}" placeholder="メーカー名">
       <div class="mkPos">
         <span>客先 <input id="mkCS${i}" type="number" inputmode="numeric" min="1" max="150" value="${v(m.cS)}">～<input id="mkCE${i}" type="number" inputmode="numeric" min="1" max="150" value="${v(m.cE)}">文字目</span>
