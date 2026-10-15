@@ -30,6 +30,11 @@ main{padding:12px;max-width:720px;margin:0 auto}
 .mkRow .mkName{font-size:16px;font-weight:700;padding:6px 8px;border:1px solid #d1d5db;border-radius:8px;width:100%;box-sizing:border-box}
 .mkRow .mkPos{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:14px}
 .mkRow .mkPos input{width:58px;padding:6px;font-size:16px;border:1px solid #d1d5db;border-radius:8px}
+.mkSmp{display:flex;flex-wrap:wrap;gap:6px}
+.mkSmp button{padding:8px 10px;font-size:13px;border-radius:8px;border:1px solid var(--pri);background:#fff;color:var(--pri);font-weight:700}
+.mkSmp button.on{background:var(--pri);color:#fff}
+.mkInfo{font-size:13px;color:#374151;line-height:1.6;word-break:break-all}
+.mkWait{display:inline-block;background:#fef3c7;color:#92400e;font-weight:700;padding:4px 8px;border-radius:6px}
 .mkRow .mkPos button{padding:6px 10px;font-size:13px;border-radius:8px;border:1px solid #9ca3af;background:#f3f4f6}
 #scanInput{width:100%;font-size:18px;padding:12px;border:2px solid var(--pri);border-radius:10px}
 .modes{display:flex;gap:8px;margin-bottom:10px}
@@ -123,17 +128,17 @@ h2{font-size:16px;margin:4px 0 10px}
         <div id="makerBtns" class="makerBtns"></div>
         <div class="posGrp">
           <div class="posTtl">客先かんばん</div>
-          <div class="posRow"><span>開始</span><button onclick="stepPos('cS',-1)">－</button><input id="pcS" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('cS',1)">＋</button><span>文字目</span></div>
-          <div class="posRow"><span>終了</span><button onclick="stepPos('cE',-1)">－</button><input id="pcE" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('cE',1)">＋</button><span>文字目</span></div>
+          <div class="posRow"><span>開始</span><button onclick="stepPos('cS',-1)">－</button><input id="pcS" type="number" inputmode="numeric" min="1" max="300" oninput="previewPos()"><button onclick="stepPos('cS',1)">＋</button><span>文字目</span></div>
+          <div class="posRow"><span>終了</span><button onclick="stepPos('cE',-1)">－</button><input id="pcE" type="number" inputmode="numeric" min="1" max="300" oninput="previewPos()"><button onclick="stepPos('cE',1)">＋</button><span>文字目</span></div>
           <div class="hint" id="pvC"></div>
         </div>
         <div class="posGrp">
           <div class="posTtl">社内かんばん</div>
-          <div class="posRow"><span>開始</span><button onclick="stepPos('iS',-1)">－</button><input id="piS" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('iS',1)">＋</button><span>文字目</span></div>
-          <div class="posRow"><span>終了</span><button onclick="stepPos('iE',-1)">－</button><input id="piE" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('iE',1)">＋</button><span>文字目</span></div>
+          <div class="posRow"><span>開始</span><button onclick="stepPos('iS',-1)">－</button><input id="piS" type="number" inputmode="numeric" min="1" max="300" oninput="previewPos()"><button onclick="stepPos('iS',1)">＋</button><span>文字目</span></div>
+          <div class="posRow"><span>終了</span><button onclick="stepPos('iE',-1)">－</button><input id="piE" type="number" inputmode="numeric" min="1" max="300" oninput="previewPos()"><button onclick="stepPos('iE',1)">＋</button><span>文字目</span></div>
           <div class="hint" id="pvI"></div>
         </div>
-        <p class="hint">1～150文字目の範囲で設定できます。下の確認は、最後に読み取ったかんばんで表示しています。</p>
+        <p class="hint">1～300文字目の範囲で設定できます。下の確認は、最後に読み取ったかんばんで表示しています。</p>
         <div class="row" style="justify-content:center">
           <button class="btn" onclick="savePos()">この位置で保存</button>
           <button class="btn gray" onclick="togglePos(false)">やめる</button>
@@ -207,6 +212,9 @@ h2{font-size:16px;margin:4px 0 10px}
     <div class="card">
       <h2>よく使う客先かんばん（抜き取り位置ボタン）</h2>
       <p class="hint">ここで登録した数値が「品番の抜き取り位置を設定」のボタンになります。開始・終了は何文字目かを入れてください。空欄のメーカーはボタンが灰色になり使えません。「今の位置を入れる」で、現在の抜き取り位置をそのまま登録できます。</p>
+      <div class="row"><label>メーカーを判定できないとき</label>
+        <select id="cfgDetFail"><option value="lock">止める（NG・担当者が解除）</option><option value="manual">今の抜き取り位置で照合する</option></select></div>
+      <p class="hint">各メーカーの「客先かんばんの見本QRを読む」を押してから、そのメーカーの客先かんばんをスキャナーで読むと見本として登録されます。照合のとき、読んだ客先かんばんを見本と比べてメーカーを自動で判定し、そのメーカーの抜き取り位置に切り替えます。見本が1件もないときは、これまでどおり手動の位置で照合します。</p>
       <div id="makerTbl"></div>
     </div>
 
@@ -253,7 +261,7 @@ h2{font-size:16px;margin:4px 0 10px}
       <h2>データ管理</h2>
       <div class="row">
         <button class="btn red" onclick="resetEdaban()">読取済みかんばんをリセット</button>
-        <button class="btn red" onclick="resetLog()">全期間の記録を消去</button>
+        <button class="btn red" onclick="resetLog()">全期間の記録を消去（読取済みかんばんも）</button>
       </div>
       <p class="hint">客先かんばんのQRの中身（全文字）がまったく同じものを「同じかんばん」としてエラーにします。枝番の位置を調べる必要はありません。便や日付が変わってリセットが必要なときに使ってください。</p>
     </div>
@@ -288,15 +296,17 @@ const LS = {
   get(k, d){ try{ const v = localStorage.getItem('gohin2fts_'+k); return v===null? d : JSON.parse(v);}catch(e){return d;} },
   set(k, v){ try{ localStorage.setItem('gohin2fts_'+k, JSON.stringify(v)); }catch(e){} }
 };
-const DEFAULT_CFG = { cPs:1, cPl:150, iPs:1, iPl:150, cmp:'full', pw:'0000', mode:'scanner' };
+const DEFAULT_CFG = { cPs:1, cPl:300, iPs:1, iPl:300, cmp:'full', pw:'0000', mode:'scanner' };
 let cfg = Object.assign({}, DEFAULT_CFG, LS.get('cfg', {}));
-if(!(cfg.cPl>0)) cfg.cPl = 150; if(!(cfg.iPl>0)) cfg.iPl = 150;   // 旧設定（0=最後まで）からの移行
+if(!(cfg.cPl>0)) cfg.cPl = 300; if(!(cfg.iPl>0)) cfg.iPl = 300;   // 旧設定（0=最後まで）からの移行
 let readC = LS.get('readC', {});        // { 客先QR全文: 読取日時 }  照合OKになった客先かんばん
 let dayLogs = [];                      // 表示中の日付の記録
 let todayStat = {ok:0, ng:0};          // 今日のOK/NG数
 let cur = null;                         // 読取中の客先かんばん
 let recheck = null;                     // 品番不一致NGの客先かんばん（解除後に正規の社内かんばんで再照合する）
 let lastScan = {v:'', t:0};             // 同じ読取データが一瞬で2回届いたときの二重処理防止
+let capture = null;                     // 設定画面で見本QRを読み取り中 {i, kind:'c'|'i'}
+let mkWork = [];                        // 設定画面で編集中のメーカー（見本QRを含む）
 let locked = false;
 let qr = null, lastCam = '', lastCamAt = 0;
 
@@ -387,22 +397,36 @@ function beep(ok){ sound(ok ? 'ok' : 'ng'); }
 /* ---------- 読み取り処理 ---------- */
 function onScan(raw){
   raw = String(raw||'').replace(/[\r\n]+$/,'');
+  if(capture && raw){ takeSample(raw); return; }        // 設定画面で見本QRを読み取り中
   if(!raw || locked) return;
   const tNow = Date.now();
   if(raw === lastScan.v && tNow - lastScan.t < 1200) return;   // スキャナー・入力の二重送信は無視
   lastScan = {v:raw, t:tNow};
   if(!cur){
     // ① 客先かんばん
-    const hin = cut(raw, cfg.cPs, cfg.cPl);
     const key = raw.trim();                       // QRの全文字で同一かんばんを判定
-    if(!norm(hin)){ return fail('客先かんばんの品番が読み取れません', raw, {hin}); }
     if(recheck && key === recheck.key){                // NGになった客先かんばんの読み直し → 再照合として受け付ける（重複にしない）
       cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); sound('read'); return;
     }
+    // メーカーの自動判定（見本QRが登録されているとき）→ そのメーカーの抜き取り位置に切り替える
+    const det = detectMaker(raw);
+    let makerName = '', makerNote = '';
+    if(det.state === 'ok'){
+      applyMakerPos(det.m); makerName = det.m.name;
+    }else if(det.state !== 'off'){
+      const why = det.state==='unknown' ? '登録したどのメーカーの見本にも似ていません（未登録のかんばんの可能性）'
+                                        : `「${det.names.join('」「')}」のどちらか判別できません`;
+      if(cfg.detFail !== 'manual'){
+        return fail('メーカーを判定できません', why + '。担当者が見本QRを登録してください', {hin:'', kind:'メーカー判定不可', raw});
+      }
+      makerNote = 'メーカー判定不可（手動の位置で照合）';
+    }
+    const hin = cut(raw, cfg.cPs, cfg.cPl);
+    if(!norm(hin)){ return fail('客先かんばんの品番が読み取れません', raw, {hin}); }
     if(readC[key]){
       return fail('同じ客先かんばんを2回読み取りました', `品番 ${hin}　／　前回の読取：${readC[key]}`, {hin, inner:'', kind:'かんばん重複'});
     }
-    cur = { raw, hin, key }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
+    cur = { raw, hin, key, maker:makerName, makerNote }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
     renderSteps();
     sound('read');
   }else{
@@ -413,7 +437,8 @@ function onScan(raw){
     let match = cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
     if(match){
       readC[cur.key] = now(); LS.set('readC', readC);
-      addLog(cur.hin, ihin, 'OK', cur.raw, cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : '');
+      addLog(cur.hin, ihin, 'OK', cur.raw, [cur.maker ? 'メーカー:'+cur.maker : '', cur.makerNote||'',
+        cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
       showOk();
       cur = null; recheck = null; LS.set('recheck', null); renderSteps(); beep(true);
     }else{
@@ -473,7 +498,7 @@ function renderSteps(){
   if(cur){
     s1.className='step done'; s2.className='step active';
     document.getElementById('s1v').textContent = cur.hin;
-    document.getElementById('s1e').textContent = cur.recheck ? 'NG後の再照合' : '読取OK';
+    document.getElementById('s1e').textContent = (cur.recheck ? 'NG後の再照合' : '読取OK') + (cur.maker ? `【${cur.maker}】` : '') + (cur.makerNote ? '（メーカー判定不可）' : '');
     document.getElementById('guide').textContent = cur.recheck
       ? 'NGのやり直し：正しい社内かんばんを読み取ってください'
       : '② 社内かんばんを読み取ってください';
@@ -723,13 +748,14 @@ function scanFlush(){
 function showScan(s){ const d = document.getElementById('scanShow'); if(d) d.textContent = s; }
 function armFlush(){ clearTimeout(scanTimer); scanTimer = setTimeout(scanFlush, 400); }   // Enterが付かない設定でも確定する
 document.addEventListener('keydown', e=>{
-  if(cfg.mode!=='scanner' || !scanTarget()) return;
+  if((cfg.mode!=='scanner' && !capture) || !scanTarget()) return;
   if(e.key==='Enter' || e.code==='Enter' || e.code==='NumpadEnter'){ e.preventDefault(); if(inp.value || codeBuf) scanFlush(); return; }
   if(e.key==='Tab' || e.code==='Tab'){ e.preventDefault(); return; }
   if(e.ctrlKey || e.altKey || e.metaKey) return;
   const t = performance.now(); if(t - scanLast > 500){ codeBuf = ''; if(document.activeElement!==inp) inp.value = ''; }
   scanLast = t;
-  let ch = charFromCode(e);
+  // 半角英数のキーが届いていればそれを使い、日本語入力に横取りされたときだけキー位置から復元する
+  let ch = (e.key && e.key.length===1 && /^[\x20-\x7E]$/.test(e.key)) ? e.key : charFromCode(e);
   if(!ch && e.key && e.key.length===1) ch = toHalf(e.key);
   if(ch){ codeBuf += ch; showScan(codeBuf); armFlush(); }
   if(document.activeElement!==inp){ focusInput(); }        // 読取欄から外れていたら戻す（キー位置の記録で取りこぼしなし）
@@ -775,11 +801,13 @@ function openSettings(){
   f('cfgOk', cfg.snd_ok||SND_DEFAULT.ok); f('cfgNg', cfg.snd_ng||SND_DEFAULT.ng); f('cfgRd', cfg.snd_read||SND_DEFAULT.read);
   f('cfgVol', String(cfg.vol||0.7)); f('cfgVib', cfg.vib||'1'); f('cfgSave', cfg.saveMode||'download'); f('cfgDayReset', cfg.dayReset||'0');
   f('cfgCmp',cfg.cmp); f('cfgPw',''); f('cfgDev', cfg.dev||'');
-  renderMakerTbl();
+  mkWork = JSON.parse(JSON.stringify(makers())); capture = null; renderMakerTbl();
+  f('cfgDetFail', cfg.detFail||'lock');
   document.getElementById('viewMain').classList.add('hidden');
   document.getElementById('viewSettings').classList.remove('hidden');
 }
 function closeSettings(){
+  capture = null;
   document.getElementById('viewSettings').classList.add('hidden');
   document.getElementById('viewMain').classList.remove('hidden');
   setMode(cfg.mode);
@@ -795,20 +823,24 @@ function saveSettings(){
   const pw = g('cfgPw').trim();
   if(pw){ if(pw.length<4){ alert('番号は4桁以上にしてください'); return; } cfg.pw = pw; }
   const mk = readMakerTbl(); if(!mk) return;
-  cfg.makers = mk;
+  cfg.makers = mk; cfg.detFail = g('cfgDetFail'); capture = null;
   LS.set('cfg', cfg); renderPosSummary(); alert('保存しました'); closeSettings();
 }
 function resetEdaban(){ if(confirm('読取済みかんばんの記録をすべて消去します。よろしいですか？')){ readC={}; LS.set('readC',readC); renderSteps(); alert('リセットしました'); } }
 async function resetLog(){
-  if(!confirm('全期間の照合記録を消去します。先に「全期間のCSV」を保存しましたか？')) return;
+  if(!confirm('全期間の照合記録と、読取済みかんばんの記録を消去します。先に「全期間のCSV」を保存しましたか？')) return;
   if(!confirm('本当に消去しますか？元に戻せません。')) return;
   if(dbh) await dbClear();
+  // 記録を消したら、重複判定に使う「読取済みかんばん」とNG後の再照合待ちも一緒にリセットする
+  readC = {}; LS.set('readC', readC);
+  recheck = null; LS.set('recheck', null); cur = null;
   todayStat = {ok:0, ng:0}; dayLogs = []; await refreshDays(); renderLog(); renderSteps();
+  alert('全期間の記録と読取済みかんばんを消去しました');
 }
 
 /* ---------- 抜き取り位置（事前設定・パスワード不要） ---------- */
 let lastRaw = LS.get('lastRaw', {c:'', i:''});
-const clampPos = v => Math.min(150, Math.max(1, Math.round(Number(v)||1)));
+const clampPos = v => Math.min(300, Math.max(1, Math.round(Number(v)||1)));
 function posFromCfg(){ return { cS:cfg.cPs, cE:cfg.cPs+cfg.cPl-1, iS:cfg.iPs, iE:cfg.iPs+cfg.iPl-1 }; }
 /* ---------- よく使う客先かんばん（メーカー別の抜き取り位置） ---------- */
 const DEFAULT_MAKERS = ['FTS プロテクター','FTS ポリ箱','アイシン高丘'];
@@ -841,16 +873,86 @@ function renderMakerTbl(){
     return `<div class="mkRow" style="border-left:8px solid ${MAKER_COLORS[i%MAKER_COLORS.length]}">
       <input class="mkName" id="mkN${i}" value="${String(m.name).replace(/"/g,'&quot;')}" placeholder="メーカー名">
       <div class="mkPos">
-        <span>客先 <input id="mkCS${i}" type="number" inputmode="numeric" min="1" max="150" value="${v(m.cS)}">～<input id="mkCE${i}" type="number" inputmode="numeric" min="1" max="150" value="${v(m.cE)}">文字目</span>
-        <span>社内 <input id="mkIS${i}" type="number" inputmode="numeric" min="1" max="150" value="${v(m.iS)}">～<input id="mkIE${i}" type="number" inputmode="numeric" min="1" max="150" value="${v(m.iE)}">文字目</span>
+        <span>客先 <input id="mkCS${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.cS)}">～<input id="mkCE${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.cE)}">文字目</span>
+        <span>社内 <input id="mkIS${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.iS)}">～<input id="mkIE${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.iE)}">文字目</span>
         <button type="button" onclick="fillMakerFromCurrent(${i})">今の位置を入れる</button>
-      </div></div>`;
+      </div>
+      <div class="mkSmp">
+        <button type="button" class="mkCap" id="mkCapC${i}" onclick="startCapture(${i},'c')">客先かんばんの見本QRを読む</button>
+        <button type="button" onclick="addLastSample(${i})">直近の客先かんばんを見本にする</button>
+        <button type="button" id="mkCapI${i}" onclick="startCapture(${i},'i')">社内かんばんの見本（確認用）</button>
+        <button type="button" onclick="clearSamples(${i})">見本を消す</button>
+      </div>
+      <div class="mkInfo" id="mkInfo${i}"></div></div>`;
   }).join('');
+  makers().forEach((m,i)=>renderSampleInfo(i));
+}
+/* ---------- 見本QR（メーカー自動判定） ---------- */
+const SAMPLE_MAX = 10;
+function startCapture(i, kind){
+  if(capture && capture.i===i && capture.kind===kind){ capture = null; makers().forEach((m,j)=>renderSampleInfo(j)); return; }   // もう一度押すと取りやめ
+  capture = {i, kind};
+  try{ document.activeElement && document.activeElement.blur(); }catch(e){}
+  makers().forEach((m,j)=>renderSampleInfo(j));
+}
+function takeSample(raw){
+  const {i, kind} = capture; capture = null;
+  const m = mkWork[i];
+  if(kind==='c'){
+    m.samples = (m.samples||[]).filter(s=>s!==raw).concat([raw]).slice(-SAMPLE_MAX);
+  }else m.iSample = raw;
+  sound('read');
+  renderSampleInfo(i);
+}
+function addLastSample(i){
+  if(!lastRaw.c){ alert('まだ客先かんばんを読み取っていません。照合画面で客先かんばんを読んでから押してください。'); return; }
+  capture = {i, kind:'c'}; takeSample(lastRaw.c);
+}
+function clearSamples(i){
+  if(!confirm(`「${mkWork[i].name}」の見本QRをすべて消します。よろしいですか？`)) return;
+  mkWork[i].samples = []; mkWork[i].iSample = ''; renderSampleInfo(i);
+}
+function renderSampleInfo(i){
+  const m = mkWork[i]; if(!m) return;
+  const el = document.getElementById('mkInfo'+i); if(!el) return;
+  const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const g = id => { const e = document.getElementById(id+i); return e ? Number(e.value) : 0; };
+  const cS=g('mkCS'), cE=g('mkCE'), iS=g('mkIS'), iE=g('mkIE');
+  const n = (m.samples||[]).length, last = n ? m.samples[n-1] : '';
+  let h = `見本QR：<b>${n}</b>件` + (n && n<3 ? '　<span style="color:#b45309">（3件以上、違う品番のかんばんで登録すると判定が確実になります）</span>' : '');
+  if(last && cS>=1 && cE>=cS) h += `<br>客先の抜き取り → 「<b>${esc([...last].slice(cS-1,cE).join(''))}</b>」`;
+  if(m.iSample && iS>=1 && iE>=iS) h += `<br>社内の抜き取り → 「<b>${esc([...m.iSample].slice(iS-1,iE).join(''))}</b>」`;
+  if(capture && capture.i===i){
+    h = `<span class="mkWait">${capture.kind==='c'?'客先':'社内'}かんばんのQRをスキャナーで読み取ってください（もう一度押すと取りやめ）</span><br>` + h;
+  }
+  el.innerHTML = h;
+  ['C','I'].forEach(k=>{ const b = document.getElementById('mkCap'+k+i); if(b) b.classList.toggle('on', !!(capture && capture.i===i && capture.kind===k.toLowerCase())); });
+}
+// 読んだQRと見本を1文字ずつ比べ、一番よく似たメーカーを選ぶ
+function qrSim(a, b){
+  const n = Math.min(a.length, b.length); let s = 0;
+  for(let k=0;k<n;k++) if(a[k]===b[k]) s++;
+  return s / Math.max(a.length, b.length);
+}
+function detectMaker(raw){
+  const list = makers().filter(m => makerReady(m) && (m.samples||[]).length);
+  if(!list.length) return {state:'off'};                       // 見本が1件もなければ従来どおり（手動の位置）
+  const sc = list.map(m => ({m, s: Math.max(...m.samples.map(x=>qrSim(raw, x)))})).sort((a,b)=>b.s-a.s);
+  const best = sc[0], second = sc[1];
+  if(best.s < 0.5) return {state:'unknown'};
+  const samePos = second && ['cS','cE','iS','iE'].every(k => second.m[k]==best.m[k]);
+  if(second && best.s - second.s < 0.05 && !samePos) return {state:'ambiguous', names:[best.m.name, second.m.name]};
+  return {state:'ok', m:best.m, score:best.s};
+}
+function applyMakerPos(m){
+  if(cfg.cPs===m.cS && cfg.cPl===m.cE-m.cS+1 && cfg.iPs===m.iS && cfg.iPl===m.iE-m.iS+1) return;
+  cfg.cPs = m.cS; cfg.cPl = m.cE - m.cS + 1; cfg.iPs = m.iS; cfg.iPl = m.iE - m.iS + 1;
+  LS.set('cfg', cfg); renderPosSummary();
 }
 function fillMakerFromCurrent(i){
   const p = posFromCfg();
-  document.getElementById('mkCS'+i).value = p.cS; document.getElementById('mkCE'+i).value = Math.min(150,p.cE);
-  document.getElementById('mkIS'+i).value = p.iS; document.getElementById('mkIE'+i).value = Math.min(150,p.iE);
+  document.getElementById('mkCS'+i).value = p.cS; document.getElementById('mkCE'+i).value = Math.min(300,p.cE);
+  document.getElementById('mkIS'+i).value = p.iS; document.getElementById('mkIE'+i).value = Math.min(300,p.iE);
 }
 function readMakerTbl(){   // 設定画面の表を読み取る。不正なら null（メッセージ表示済み）
   const out = [];
@@ -858,19 +960,23 @@ function readMakerTbl(){   // 設定画面の表を読み取る。不正なら n
     const g = id => document.getElementById(id+i).value.trim();
     const name = g('mkN') || makers()[i].name;
     const nums = ['mkCS','mkCE','mkIS','mkIE'].map(g);
-    if(nums.every(x=>x==='')){ out.push({name, cS:null, cE:null, iS:null, iE:null}); continue; }
+    const smp = {samples:(mkWork[i] && mkWork[i].samples)||[], iSample:(mkWork[i] && mkWork[i].iSample)||''};
+    if(nums.every(x=>x==='')){
+      if(smp.samples.length){ alert(`「${name}」は見本QRがあるので、抜き取り位置の数値も入れてください。`); return null; }
+      out.push(Object.assign({name, cS:null, cE:null, iS:null, iE:null}, smp)); continue;
+    }
     const [cS,cE,iS,iE] = nums.map(Number);
-    if(nums.some(x=>x==='') || [cS,cE,iS,iE].some(x=>!(x>=1 && x<=150 && Number.isInteger(x)))){
-      alert(`「${name}」の数値は4つとも1～150の整数で入れてください（使わない場合は4つとも空欄）。`); return null; }
+    if(nums.some(x=>x==='') || [cS,cE,iS,iE].some(x=>!(x>=1 && x<=300 && Number.isInteger(x)))){
+      alert(`「${name}」の数値は4つとも1～300の整数で入れてください（使わない場合は4つとも空欄）。`); return null; }
     if(cE<cS || iE<iS){ alert(`「${name}」の終了は開始以上にしてください。`); return null; }
-    out.push({name, cS, cE, iS, iE});
+    out.push(Object.assign({name, cS, cE, iS, iE}, smp));
   }
   return out;
 }
 function renderPosSummary(){
   const p = posFromCfg(), m = currentMaker();
   document.getElementById('posSummary').innerHTML = (m ? `<b>【${String(m.name).replace(/[&<>"]/g,'')}】</b>` : '') +
-    `客先：<b>${p.cS}～${Math.min(150,p.cE)}</b>文字目　／　社内：<b>${p.iS}～${Math.min(150,p.iE)}</b>文字目`;
+    `客先：<b>${p.cS}～${Math.min(300,p.cE)}</b>文字目　／　社内：<b>${p.iS}～${Math.min(300,p.iE)}</b>文字目`;
 }
 function togglePos(open){
   const ed = document.getElementById('posEdit');
