@@ -22,6 +22,7 @@ main{padding:12px;max-width:720px;margin:0 auto}
 .step .val{font-size:20px;font-weight:700;word-break:break-all;min-height:28px}
 .step .sub{font-size:13px;color:var(--sub)}
 .guide{font-size:22px;font-weight:700;text-align:center;margin:12px 0}
+.guide.busy{background:#fde68a;color:#92400e;border-radius:10px;padding:8px}
 .makerBtns{display:grid;grid-template-columns:1fr;gap:12px;margin:8px 0 14px}
 .makerBtns button{padding:22px 6px;font-size:24px;font-weight:700;border-radius:12px;border:4px solid transparent;color:#fff}
 .makerBtns button.on{border-color:#111827;box-shadow:0 0 0 3px #fff inset}
@@ -193,14 +194,29 @@ h2{font-size:16px;margin:4px 0 10px}
   <section id="viewSettings" class="hidden">
     <div class="card">
       <h2>照合ルール</h2>
+      <div class="row"><label>スキャナーの1件の区切り</label>
+        <select id="cfgTerm">
+          <option value="auto">自動（Enterが届いたらEnterで区切る）</option>
+          <option value="enter">Enterで区切る</option>
+          <option value="idle">0.4秒止まったら区切る（スキャナーがEnterを送らない設定のとき）</option>
+        </select></div>
+      <p class="hint">長いQRは、スキャナーから全部届くまで時間がかかります。途中で次を読むと、送信が一瞬止まることがあります。Enterで区切れば、途中で止まっても1件のまま受け取るので、2件に分かれてNGになることはありません。読取中は案内が黄色の「読み取り中」になります。</p>
       <div class="row"><label>照合のしかた</label>
         <select id="cfgHow">
           <option value="contain">社内品番が客先かんばんのQRに入っていればOK（抜き取り設定いらず）</option>
           <option value="pos">抜き取り位置どうしを比べる（従来の方法）</option>
         </select></div>
-      <p class="hint">「入っていればOK」のときは、客先かんばんはQRの全文を見るので、メーカー選択・見本QR・客先の抜き取り位置は使いません。社内かんばんは、社内の抜き取り位置（初期値は全文）で品番を取り出します。</p>
-      <div class="row"><label>社内品番の最低文字数</label><input id="cfgMinLen" type="number" inputmode="numeric" min="4" max="30" style="max-width:90px"><span>文字</span></div>
-      <p class="hint">「入っていればOK」のとき、社内品番（ハイフン・空白を除く）がこの文字数より短いとNGで止めます。短い番号は、客先QRの別の数字にたまたま一致してしまうおそれがあるためです。初期値は8文字。</p>
+      <p class="hint">「入っていればOK」のときは、社内かんばんのQRから「5桁-5桁」の品番（例：G963H-58010）を自動で取り出し、客先かんばんのQR全文の中にあるかを探します。客先側がハイフンなしの10桁（例：G963H58010）でも一致します。メーカー選択・見本QR・抜き取り位置は使いません。</p>
+      <div class="row"><label>照合に使うもの（入っていればOKのとき）</label>
+        <select id="cfgSeb">
+          <option value="both">品番と背番号の両方が入っていればOK（おすすめ）</option>
+          <option value="hin">品番だけ</option>
+          <option value="seb">背番号だけ</option>
+        </select></div>
+      <p class="hint">社内かんばんのQRが「AAA,品番,背番号,数量」（例：AAA,12345-6890,ABCD,10）の形なら、品番と背番号をそこから取り出します。この形でないときは「5桁-5桁」の品番だけで照合します。背番号は4文字ほどと短く、客先QRの別の部分と偶然一致することがあるため、「背番号だけ」より「両方」をおすすめします。</p>
+      <div class="row"><label>社内品番のハイフンの前の「T」</label>
+        <select id="cfgIT"><option value="1">外して照合する</option><option value="0">外さない</option></select></div>
+      <p class="hint">社内かんばんの品番で、ハイフンのすぐ前にある「T」を外してから照合します（例：12345T-67890 → 12345-67890、T-12345 → 12345）。全角の「Ｔ」「－」「ー」でも外れます。客先かんばんの品番はそのままです。</p>
       <div class="row"><label>品番の比較（従来の方法のとき）</label>
         <select id="cfgCmp">
           <option value="full">全桁一致</option>
@@ -208,9 +224,6 @@ h2{font-size:16px;margin:4px 0 10px}
         </select>
       </div>
       <p class="hint">ハイフン・スペースは自動で取り除いて比較します（全角・半角どちらも）。</p>
-      <div class="row"><label>社内品番のハイフンの前の「T」</label>
-        <select id="cfgIT"><option value="1">外して照合する</option><option value="0">外さない</option></select></div>
-      <p class="hint">社内かんばんの品番で、ハイフンのすぐ前にある「T」を外してから照合します（例：12345T-67890 → 12345-67890、T-12345 → 12345）。全角の「Ｔ」「－」「ー」でも外れます。客先かんばんの品番はそのままです。</p>
     </div>
 
     <div class="card">
@@ -319,30 +332,47 @@ function norm(s){
   return String(s||'').replace(/[\-‐－―ー−–—\s　]/g,'').toUpperCase()
     .replace(/[Ａ-Ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0));
 }
-// 社内品番のハイフンのすぐ前にある「T」を外す（例：12345T-67890 → 12345-67890）。設定で切り替え
-function hyph(s){ return String(s||'').replace(/[‐－―ー−–—]/g,'-'); }
-function stripPre(s){
-  if(cfg.iT === '0') return {hin:s, pre:''};
-  const t = hyph(toHalf(String(s||'')));
-  const out = t.replace(/[Tt](?=[ ]*-)/g, '');
-  return out !== t ? {hin:out, pre:'T'} : {hin:s, pre:''};
-}
 /* ---------- 「入っていればOK」照合 ---------- */
 function howMode(){ return cfg.how === 'pos' ? 'pos' : 'contain'; }   // 初期値は「入っていればOK」
-function minLen(){ return Number(cfg.minLen) >= 4 ? Number(cfg.minLen) : 8; }
+function hyph(s){ return String(s||'').replace(/[‐－―ー−–—]/g,'-'); }
+// 社内品番のハイフンのすぐ前にある「T」を外す（例：12345T-67890 → 12345-67890）。設定で切り替え
+function stripT(s){
+  if(cfg.iT === '0') return String(s||'');
+  return hyph(toHalf(String(s||''))).replace(/[Tt](?=[ ]*-)/g, '');
+}
+function hasT(s){ return cfg.iT !== '0' && stripT(s) !== hyph(toHalf(String(s||''))); }
+// 社内かんばんのQRから「5桁-5桁」の品番を取り出す（全角・いろいろなハイフンも可）
+function innerPart(raw){
+  const t = hyph(toHalf(String(raw||''))).toUpperCase();
+  const m = t.match(/([0-9A-Z]{5})\s*-\s*([0-9A-Z]{5})/);
+  return m ? m[1] + '-' + m[2] : '';
+}
+// 社内かんばんQRから品番・背番号・数量を取り出す。「AAA,品番,背番号,数量」の形を優先、なければ「5桁-5桁」の品番だけ
+function sebMode(){ return ['hin','seb'].includes(cfg.seb) ? cfg.seb : 'both'; }
+function innerFields(raw){
+  const t = hyph(toHalf(String(raw||''))).replace(/[、，]/g, ',');
+  const f = t.split(',').map(x => x.trim());
+  if(f.length >= 3 && norm(f[1]) && norm(f[2])) return {hin:stripT(f[1]).toUpperCase(), seb:f[2].toUpperCase(), qty:f[3]||'', csv:true, tCut:hasT(f[1])};
+  return {hin:innerPart(stripT(raw)), seb:'', qty:'', csv:false, tCut:hasT(raw) && !!innerPart(stripT(raw))};
+}
+// 社内かんばんの形（AAA,品番,背番号,数量）か。①で読まれたときの読み順ズレ検出用
+function looksInner(raw){
+  const f = hyph(toHalf(String(raw||''))).replace(/[、，]/g, ',').split(',').map(x=>x.trim());
+  return f.length === 4 && /^[0-9A-Z]{5}-[0-9A-Z]{4,5}$/i.test(stripT(f[1]).trim()) && !!f[2] && /^\d+$/.test(f[3]);
+}
 // norm() と同じ変換をしつつ、変換後の1文字が元の何文字目かを覚えておく（どこに見つかったかを示すため）
 function normMap(s){
   let out = '', map = [];
   [...String(s||'')].forEach((c, i) => { const n = norm(c); for(const x of n){ out += x; map.push(i); } });
   return {out, map};
 }
-// 社内品番が客先QRの中にあるか探す。見つかったら、客先QRの中の該当部分と位置を返す
+// 社内品番が客先QRの中にあるか探す（ハイフン・空白・全角半角の違いは無視）。見つかったら該当部分と位置を返す
 function findIn(raw, ihin){
   const b = norm(ihin); if(!b) return null;
   const {out, map} = normMap(raw), chars = [...raw];
   const at = out.indexOf(b); if(at < 0) return null;
-  const s = map[at], e = map[at + b.length - 1];
-  return {seg: chars.slice(s, e+1).join(''), pos: s+1, end: e+1, more: out.indexOf(b, at+1) >= 0};
+  const st = map[at], e = map[at + b.length - 1];
+  return {seg: chars.slice(st, e+1).join(''), pos: st+1, end: e+1};
 }
 function cut(raw, start, len){
   const s = Math.max(1, Number(start)||1) - 1;
@@ -378,7 +408,6 @@ function tone(freq, start, dur, type, vol, fEnd){
 const SOUNDS = {
   ok: {
     // パチンコ台風：音程が一気に駆け上がる「キュイーン」と、当たり確定のファンファーレ
-    // 添付してもらった音声ファイル（mp3）。ページの中に埋め込んであるので、オフラインでも鳴る
     mp3main: ['追加した音（頭の無音を飛ばす・約7.5秒）', {clip:'okMp3', from:2.4}],
     mp3full: ['追加した音（そのまま・約10秒）', {clip:'okMp3', from:0}],
     kyuin:   ['キュイーン×2（パチンコ風）', [[500,0,.42,'sawtooth',.35,3200],[505,0,.42,'square',.25,3230],[3200,.42,.08,'square',.4],
@@ -479,6 +508,10 @@ function onScan(raw){
     if(recheck && key === recheck.key){                // NGになった客先かんばんの読み直し → 再照合として受け付ける（重複にしない）
       cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); sound('read'); return;
     }
+    if(howMode() === 'contain' && looksInner(raw)){
+      // 社内かんばんを①で読んだ（読み順のズレ）。ロックせず案内し、ズレが続かないよう①のまま待つ
+      imeWarn('これは社内かんばんです。① 客先かんばんから読んでください'); sound('ng'); return;
+    }
     if(howMode() === 'contain'){
       // 入っていればOK：客先はQR全文を使うので、メーカー判定・抜き取りはしない
       if(readC[key]) return fail('同じ客先かんばんを2回読み取りました', `前回の読取：${readC[key]}`, {hin:'', kind:'かんばん重複', raw});
@@ -492,7 +525,7 @@ function onScan(raw){
       applyMakerPos(det.m); makerName = det.m.name;
     }else if(det.state !== 'off'){
       const why = det.state==='unknown' ? '登録したどのメーカーの見本にも似ていません（未登録のかんばんの可能性）'
-                                        : `「${det.names.join('」「')}」のどちらか判別できません`;
+                                        : `「${det.names.join('」「')}」のどちらか判別できません（両方のメーカーに違う品番の見本を5件以上登録すると見分けられます）`;
       if(cfg.detFail !== 'manual'){
         return fail('メーカーを判定できません', why + '。担当者が見本QRを登録してください', {hin:'', kind:'メーカー判定不可', raw});
       }
@@ -509,32 +542,43 @@ function onScan(raw){
   }else{
     // ② 社内かんばん
     if(cur.recheck && raw.trim() === cur.key){ sound('read'); return; }   // 再照合中に同じ客先かんばんを読み直しても、そのまま②を待つ
-    const ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
-    const sp = stripPre(ihin);                         // 社内品番のハイフン前の「T」を外して比べる
     if(cur.whole){
-      // 入っていればOK：社内品番が客先かんばんのQR全文の中にあるか探す
-      const b = norm(sp.hin);
-      if(b.length < minLen()){
-        return fail('社内かんばんの品番が短すぎます', `社内：${ihin}（${b.length}文字）。${minLen()}文字以上必要です。社内の抜き取り位置を確認してください`, {hin:'', inner:ihin, kind:'社内品番が短い', raw:cur.raw});
+      // 入っていればOK：社内かんばんの「5桁-5桁」の品番が、客先かんばんのQR全文の中にあるか探す
+      lastRaw.i = raw; LS.set('lastRaw', lastRaw);
+      const fi = innerFields(raw), mode = sebMode(), sebTxt = fi.seb ? `背番号「${fi.seb}」` : '';
+      const useHin = mode !== 'seb', useSeb = mode !== 'hin' && !!fi.seb;
+      if(mode === 'seb' && !fi.seb){
+        return fail('社内かんばんの背番号が見つかりません', `社内かんばんのQRが「AAA,品番,背番号,数量」の形ではありません（読取内容：${raw.slice(0,40)}）`, {hin:'', inner:raw.slice(0,40), kind:'背番号なし', raw:cur.raw});
       }
-      const hit = findIn(cur.raw, sp.hin);
-      if(hit){
-        cur.hin = hit.seg;
-        readC[cur.key] = now(); LS.set('readC', readC);
-        addLog(hit.seg, ihin, 'OK', cur.raw, [`客先QRの${hit.pos}～${hit.end}文字目に一致`, sp.pre ? '社内品番のハイフン前の「T」を外して照合' : '',
-          cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
-        showOk();
-        cur = null; recheck = null; LS.set('recheck', null); renderSteps(); beep(true);
+      if(useHin && !fi.hin){
+        return fail('社内かんばんの品番が見つかりません', `社内かんばんのQRに品番がありません（読取内容：${raw.slice(0,40)}）`, {hin:'', inner:raw.slice(0,40), kind:'社内品番なし', raw:cur.raw});
+      }
+      const hHit = useHin ? findIn(cur.raw, fi.hin) : null;
+      const sHit = useSeb ? findIn(cur.raw, fi.seb) : null;
+      const inner = fi.hin || fi.seb;
+      if(useHin && !hHit){
+        fail('品番不一致（誤品の可能性）', `社内品番「${fi.hin}」${sebTxt ? `（${sebTxt}）` : ''}が、客先かんばんのQRの中にありません`, {hin:'', inner, kind:'品番不一致', raw:cur.raw});
+      }else if(useSeb && !sHit){
+        fail('背番号不一致（誤品の可能性）', `社内かんばんの${sebTxt}が、客先かんばんのQRの中にありません` + (hHit ? '（品番は一致）' : ''), {hin:'', inner, kind:'背番号不一致', raw:cur.raw});
       }else{
-        fail('品番不一致（誤品の可能性）', `社内品番「${ihin}」が、客先かんばんのQRの中にありません`, {hin:'', inner:ihin, kind:'品番不一致', raw:cur.raw});
+        cur.hin = hHit ? hHit.seg : sHit.seg;
+        readC[cur.key] = now(); LS.set('readC', readC);
+        addLog(cur.hin, inner, 'OK', cur.raw, [
+          hHit ? `品番：客先QRの${hHit.pos}～${hHit.end}文字目に一致` : '',
+          sHit ? `背番号${fi.seb}：客先QRの${sHit.pos}～${sHit.end}文字目に一致` : (fi.seb ? `背番号${fi.seb}（照合なし）` : ''),
+          fi.tCut ? '社内品番のハイフン前の「T」を外して照合' : '',
+          cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
+        showOk(fi.seb ? `背番号 ${fi.seb}` : '');
+        cur = null; recheck = null; LS.set('recheck', null); renderSteps(); beep(true);
       }
       return;
     }
-    const a = norm(cur.hin), b = norm(sp.hin);
+    const ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
+    const a = norm(cur.hin), b = norm(stripT(ihin));
     let match = cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
     if(match){
       readC[cur.key] = now(); LS.set('readC', readC);
-      addLog(cur.hin, ihin, 'OK', cur.raw, [cur.maker ? 'メーカー:'+cur.maker : '', cur.makerNote||'', sp.pre ? '社内品番のハイフン前の「T」を外して照合' : '',
+      addLog(cur.hin, ihin, 'OK', cur.raw, [cur.maker ? 'メーカー:'+cur.maker : '', cur.makerNote||'',
         cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
       showOk();
       cur = null; recheck = null; LS.set('recheck', null); renderSteps(); beep(true);
@@ -547,17 +591,18 @@ function fail(title, detail, rec){
   const log = addLog(rec.hin||'', rec.inner||'', 'NG：' + (rec.kind||title), rec.raw||'',
                      cur && cur.recheck ? `再照合でもNG（前回NG 通し番号 ${cur.ngNo}）` : '');
   // 品番不一致のときは客先かんばんを覚えておき、解除後に正規の社内かんばんで再照合させる
-  if(rec.kind === '品番不一致' && cur){
+  if((rec.kind === '品番不一致' || rec.kind === '背番号不一致') && cur){
     recheck = { raw:cur.raw, hin:cur.hin, key:cur.key, whole:!!cur.whole, ngNo:log.no };
     LS.set('recheck', recheck);
   }
   cur = null; renderSteps();
   lock(title, detail);
 }
-function showOk(){
+function showOk(sub){
   const r = document.getElementById('result');
   r.className = 'result ok'; r.textContent = 'OK';
-  clearTimeout(showOk.t); showOk.t = setTimeout(()=>{ r.className='result'; }, 1500);
+  if(sub){ const d = document.createElement('div'); d.style.fontSize = '30px'; d.textContent = sub; r.appendChild(d); }
+  clearTimeout(showOk.t); showOk.t = setTimeout(()=>{ r.className='result'; }, sub ? 2500 : 1500);
 }
 function cancelCurrent(){ cur = null; renderSteps(); focusInput(); }
 
@@ -800,6 +845,15 @@ const inp = document.getElementById('scanInput');
       日本語入力がキーを横取りしても、こちらで正しい半角英数を復元できる。
    Enter（または入力が0.4秒止まる）で1件として確定する。 */
 let codeBuf = '', scanLast = 0, scanTimer = null;
+let enterSeen = LS.get('enterSeen', false);   // スキャナーがEnterを送ってくることを一度でも確認したか
+// Enterで区切るか（Enterで区切るときは、送信が途中で止まっても待ち続け、1件を2件に分けない）
+function useEnter(){ const m = cfg.term || 'auto'; return m === 'enter' || (m === 'auto' && enterSeen); }
+function gapMs(){ return useEnter() ? 3000 : 400; }   // Enterで区切るときの3秒は、Enterが落ちたときの保険
+function setBusy(on){
+  const g = document.getElementById('guide'); if(!g) return;
+  if(on){ if(!g.classList.contains('busy')){ g.classList.add('busy'); g.textContent = '読み取り中… 音が鳴るまで次を読まないでください'; } }
+  else if(g.classList.contains('busy')){ g.classList.remove('busy'); renderSteps(); }
+}
 function scanTarget(){ const a = document.activeElement; return !a || a===document.body || a===inp; }
 const CODE_MAP = {
   Digit1:['1','!'],Digit2:['2','@'],Digit3:['3','#'],Digit4:['4','$'],Digit5:['5','%'],
@@ -833,7 +887,7 @@ function imeWarn(msg){
 function scanFlush(){
   clearTimeout(scanTimer);
   const fromField = toHalf(inp.value), fromCode = codeBuf;
-  inp.value = ''; codeBuf = ''; showScan('');
+  inp.value = ''; codeBuf = ''; showScan(''); setBusy(false);
   // 読取欄の文字が半角英数ならそれを使う。かなが混ざった・空のときは、キー位置から組み立てた文字を使う
   const okF = fromField.trim() && isAscii(fromField), okC = fromCode.trim() && isAscii(fromCode);
   let v = '';
@@ -848,18 +902,22 @@ function scanFlush(){
   onScan(v);
 }
 function showScan(s){ const d = document.getElementById('scanShow'); if(d) d.textContent = s; }
-function armFlush(){ clearTimeout(scanTimer); scanTimer = setTimeout(scanFlush, 400); }   // Enterが付かない設定でも確定する
+function armFlush(){ clearTimeout(scanTimer); scanTimer = setTimeout(scanFlush, gapMs()); }   // Enterが付かない設定でも確定する
 document.addEventListener('keydown', e=>{
   if((cfg.mode!=='scanner' && !capture) || !scanTarget()) return;
-  if(e.key==='Enter' || e.code==='Enter' || e.code==='NumpadEnter'){ e.preventDefault(); if(inp.value || codeBuf) scanFlush(); return; }
+  if(e.key==='Enter' || e.code==='Enter' || e.code==='NumpadEnter'){
+    e.preventDefault();
+    if(inp.value || codeBuf){ if(!enterSeen){ enterSeen = true; LS.set('enterSeen', true); } scanFlush(); }
+    return;
+  }
   if(e.key==='Tab' || e.code==='Tab'){ e.preventDefault(); return; }
   if(e.ctrlKey || e.altKey || e.metaKey) return;
-  const t = performance.now(); if(t - scanLast > 500){ codeBuf = ''; if(document.activeElement!==inp) inp.value = ''; }
+  const t = performance.now(); if(t - scanLast > gapMs() + 100){ codeBuf = ''; if(document.activeElement!==inp) inp.value = ''; }
   scanLast = t;
   // 半角英数のキーが届いていればそれを使い、日本語入力に横取りされたときだけキー位置から復元する
   let ch = (e.key && e.key.length===1 && /^[\x20-\x7E]$/.test(e.key)) ? e.key : charFromCode(e);
   if(!ch && e.key && e.key.length===1) ch = toHalf(e.key);
-  if(ch){ codeBuf += ch; showScan(codeBuf); armFlush(); }
+  if(ch){ codeBuf += ch; showScan(codeBuf); setBusy(true); armFlush(); }
   if(document.activeElement!==inp){ focusInput(); }        // 読取欄から外れていたら戻す（キー位置の記録で取りこぼしなし）
 });
 inp.addEventListener('input', ()=>{ scanLast = performance.now(); armFlush(); });
@@ -902,7 +960,7 @@ function openSettings(){
   opts('cfgOk','ok'); opts('cfgNg','ng'); opts('cfgRd','read');
   f('cfgOk', cfg.snd_ok||SND_DEFAULT.ok); f('cfgNg', cfg.snd_ng||SND_DEFAULT.ng); f('cfgRd', cfg.snd_read||SND_DEFAULT.read);
   f('cfgVol', String(cfg.vol||0.7)); f('cfgVib', cfg.vib||'1'); f('cfgSave', cfg.saveMode||'download'); f('cfgDayReset', cfg.dayReset||'0');
-  f('cfgCmp',cfg.cmp); f('cfgHow', howMode()); f('cfgMinLen', minLen()); f('cfgIT', cfg.iT==='0' ? '0' : '1'); f('cfgPw',''); f('cfgDev', cfg.dev||'');
+  f('cfgCmp',cfg.cmp); f('cfgIT', cfg.iT==='0' ? '0' : '1'); f('cfgHow', howMode()); f('cfgTerm', cfg.term||'auto'); f('cfgSeb', sebMode()); f('cfgPw',''); f('cfgDev', cfg.dev||'');
   mkWork = JSON.parse(JSON.stringify(makers())); capture = null; renderMakerTbl();
   f('cfgDetFail', cfg.detFail||'lock');
   document.getElementById('viewMain').classList.add('hidden');
@@ -916,8 +974,7 @@ function closeSettings(){
 }
 function saveSettings(){
   const g = id => document.getElementById(id).value;
-  cfg.cmp=g('cfgCmp'); cfg.how=g('cfgHow');
-  const ml = Math.round(Number(g('cfgMinLen'))); if(!(ml>=4 && ml<=30)){ alert('社内品番の最低文字数は4～30で入れてください'); return; } cfg.minLen = ml; cfg.iT=g('cfgIT');
+  cfg.cmp=g('cfgCmp'); cfg.iT=g('cfgIT'); cfg.how=g('cfgHow'); cfg.term=g('cfgTerm'); cfg.seb=g('cfgSeb');
   cfg.snd_ok=g('cfgOk'); cfg.snd_ng=g('cfgNg'); cfg.snd_read=g('cfgRd'); cfg.vol=g('cfgVol'); cfg.vib=g('cfgVib');
   cfg.saveMode=g('cfgSave'); cfg.dayReset=g('cfgDayReset');
   // 全角英数は半角に。空白・ファイル名に使えない記号・制御文字は取り除く（かな・漢字はそのまま）
@@ -1023,12 +1080,21 @@ function renderSampleInfo(i){
   const g = id => { const e = document.getElementById(id+i); return e ? Number(e.value) : 0; };
   const cS=g('mkCS'), cE=g('mkCE'), iS=g('mkIS'), iE=g('mkIE');
   const n = (m.samples||[]).length, last = n ? m.samples[n-1] : '';
-  let h = `見本QR：<b>${n}</b>件` + (n && n<3 ? '　<span style="color:#b45309">（3件以上、違う品番のかんばんで登録すると判定が確実になります）</span>' : '');
+  // 形式がよく似た別メーカー（見本どうしが5割以上一致）を探し、見分けに使う場所を表示する
+  const similar = mkWork.filter((o,j) => j!==i && (o.samples||[]).length && n &&
+    Math.max(...o.samples.map(x=>qrSim(last, x))) >= 0.5);
+  const need = similar.length ? 5 : 3;
+  let h = `見本QR：<b>${n}</b>件` + (n && n<need ? `　<span style="color:#b45309">（${need}件以上、違う品番のかんばんで登録すると判定が確実になります）</span>` : '');
+  similar.forEach(o => {
+    const kp = keyPositions(m, o);
+    h += kp.length > 30
+      ? `<br>「${esc(o.name)}」と形式が似ています → 見本が少なく、見分ける場所がまだ絞れていません。両方に違う品番の見本を追加してください。`
+      : kp.length
+      ? `<br>「${esc(o.name)}」と形式が似ています → 見分ける場所：<b>${esc(rangeText(kp))}</b>文字目`
+      : `<br><span style="color:#b91c1c">「${esc(o.name)}」と形式が似ていて、見分ける場所がまだ見つかりません。両方のメーカーに違う品番の見本を追加してください。</span>`;
+  });
   if(last && cS>=1 && cE>=cS) h += `<br>客先の抜き取り → 「<b>${esc([...last].slice(cS-1,cE).join(''))}</b>」`;
-  if(m.iSample && iS>=1 && iE>=iS){
-    const seg = [...m.iSample].slice(iS-1,iE).join(''), sp = stripPre(seg);
-    h += `<br>社内の抜き取り → 「<b>${esc(seg)}</b>」` + (sp.pre ? `（ハイフン前の「T」を外して「<b>${esc(sp.hin)}</b>」で照合）` : '');
-  }
+  if(m.iSample && iS>=1 && iE>=iS) h += `<br>社内の抜き取り → 「<b>${esc([...m.iSample].slice(iS-1,iE).join(''))}</b>」`;
   if(capture && capture.i===i){
     h = `<span class="mkWait">${capture.kind==='c'?'客先':'社内'}かんばんのQRをスキャナーで読み取ってください（もう一度押すと取りやめ）</span><br>` + h;
   }
@@ -1047,9 +1113,41 @@ function detectMaker(raw){
   const sc = list.map(m => ({m, s: Math.max(...m.samples.map(x=>qrSim(raw, x)))})).sort((a,b)=>b.s-a.s);
   const best = sc[0], second = sc[1];
   if(best.s < 0.5) return {state:'unknown'};
-  const samePos = second && ['cS','cE','iS','iE'].every(k => second.m[k]==best.m[k]);
-  if(second && best.s - second.s < 0.05 && !samePos) return {state:'ambiguous', names:[best.m.name, second.m.name]};
-  return {state:'ok', m:best.m, score:best.s};
+  if(!second || best.s - second.s >= 0.15) return {state:'ok', m:best.m, score:best.s};
+  const samePos = ['cS','cE','iS','iE'].every(k => second.m[k]==best.m[k]);
+  if(samePos) return {state:'ok', m:best.m, score:best.s};        // 抜き取り位置が同じなら、どちらでも照合結果は同じ
+  // 形式がよく似たメーカー（例：トヨタと豊鉄）は、2社の見本で「必ず違う文字になる場所」（納入先・仕入先コードなど）で見分ける
+  const pick = keyPosPick(raw, best.m, second.m);
+  if(pick) return {state:'ok', m:pick, score:best.s, byKey:true};
+  return {state:'ambiguous', names:[best.m.name, second.m.name]};
+}
+function rangeText(nums){   // [11,12,13,14,20] → "11〜14、20"
+  const out = []; let s = null, p = null;
+  nums.forEach(n => { if(s===null){ s=p=n; } else if(n===p+1){ p=n; } else { out.push(s===p?`${s}`:`${s}〜${p}`); s=p=n; } });
+  if(s!==null) out.push(s===p?`${s}`:`${s}〜${p}`);
+  return out.join('、');
+}
+// 見本のうち、全件で同じ文字になっている場所 → {位置: 文字}
+function fixedChars(samples){
+  const n = Math.min(...samples.map(s=>s.length)), out = {};
+  for(let i=0;i<n;i++){ const c = samples[0][i]; if(samples.every(s=>s[i]===c)) out[i] = c; }
+  return out;
+}
+function keyPosPick(raw, A, B){
+  const fa = fixedChars(A.samples), fb = fixedChars(B.samples);
+  const disc = Object.keys(fa).filter(i => i in fb && fa[i] !== fb[i]).map(Number);
+  if(!disc.length) return null;
+  let a = 0, b = 0;
+  disc.forEach(i => { if(raw[i]===fa[i]) a++; if(raw[i]===fb[i]) b++; });
+  if(a - b >= disc.length * 0.3) return A;
+  if(b - a >= disc.length * 0.3) return B;
+  return null;
+}
+// 2社の見本を比べて、見分けに使える場所（文字目）を返す（設定画面の表示用）
+function keyPositions(A, B){
+  if(!(A.samples||[]).length || !(B.samples||[]).length) return [];
+  const fa = fixedChars(A.samples), fb = fixedChars(B.samples);
+  return Object.keys(fa).filter(i => i in fb && fa[i] !== fb[i]).map(i=>Number(i)+1);
 }
 function applyMakerPos(m){
   if(cfg.cPs===m.cS && cfg.cPl===m.cE-m.cS+1 && cfg.iPs===m.iS && cfg.iPl===m.iE-m.iS+1) return;
@@ -1108,9 +1206,7 @@ function previewPos(){
   const show = (raw, s, e, id) => {
     const el = document.getElementById(id);
     if(e < s){ el.innerHTML = '<span style="color:#dc2626">終了は開始以上にしてください</span>'; return; }
-    const seg = raw ? [...raw].slice(s-1, e).join('') : '';
-    const sp = id==='pvI' && raw ? stripPre(seg) : {pre:''};
-    el.textContent = raw ? `直近の読取 → 「${seg}」` + (sp.pre ? `（ハイフン前の「T」を外して「${sp.hin}」で照合）` : '') : '（まだ読み取りがありません）';
+    el.textContent = raw ? `直近の読取 → 「${[...raw].slice(s-1, e).join('')}」` : '（まだ読み取りがありません）';
   };
   show(lastRaw.c, v('cS'), v('cE'), 'pvC');
   show(lastRaw.i, v('iS'), v('iE'), 'pvI');
