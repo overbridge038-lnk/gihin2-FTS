@@ -214,6 +214,7 @@ h2{font-size:16px;margin:4px 0 10px}
           <option value="seb">背番号だけ</option>
         </select></div>
       <p class="hint">社内かんばんのQRが「AAA,品番,背番号,数量」（例：AAA,12345-6890,ABCD,10）の形なら、品番と背番号をそこから取り出します。この形でないときは「5桁-5桁」の品番だけで照合します。背番号は4文字ほどと短く、客先QRの別の部分と偶然一致することがあるため、「背番号だけ」より「両方」をおすすめします。</p>
+      <p class="hint">品番の照合範囲は、照合画面の「メーカー選択」で選んだメーカーで決まります。「FTS プロテクター」「FTS ポリ箱」を選んでいるときは、社内品番のハイフンと後ろ5桁の6文字（例：S7606T-60270 → -60270）だけで照合します。それ以外（アイシン高丘・未選択）は品番全体で照合します。メーカーごとの切り替えは、下の「よく使う客先かんばん」で変えられます。</p>
       <div class="row"><label>社内品番のハイフンの前の「T」</label>
         <select id="cfgIT"><option value="1">外して照合する</option><option value="0">外さない</option></select></div>
       <p class="hint">社内かんばんの品番で、ハイフンのすぐ前にある「T」を外してから照合します（例：12345T-67890 → 12345-67890、T-12345 → 12345）。全角の「Ｔ」「－」「ー」でも外れます。客先かんばんの品番はそのままです。</p>
@@ -353,6 +354,25 @@ function stripHead(s){
   if(m) return m[1] ? {hin:m[2]+'-'+m[3], head:m[1]} : {hin:t, head:''};
   const h = t.match(/^([A-Z]+)(?=[0-9])/);                    // それ以外の形：数字の前のアルファベットを外す
   return h ? {hin:t.slice(h[1].length), head:h[1]} : {hin:t, head:''};
+}
+/* ---------- 「ハイフンと後ろ5桁」照合（例：S7606T-60270 → -60270） ---------- */
+// 選んでいるメーカーが「ハイフンと後ろ5桁」で照合するメーカーなら 'tail'、それ以外は 'full'（品番全体）
+function makerTail(m){ return m ? (m.tail === undefined ? /^FTS/i.test(String(m.name).trim()) : !!m.tail) : false; }
+function partMode(){ return makerTail(currentMaker()) ? 'tail' : 'full'; }
+// 品番の中の最初のハイフンと、その後ろ5桁を取り出す（全角・いろいろなハイフンも可）。見つからなければ ''
+function tailOf(s){
+  const t = hyph(toHalf(String(s||''))).toUpperCase();
+  const m = t.match(/-\s*([0-9A-Z]{5})(?![0-9A-Z])/) || t.match(/-\s*([0-9A-Z]{5})/);
+  return m ? '-' + m[1] : '';
+}
+// 客先QRの中から「-60270」を探す。見つかったら、その品番のまとまり（例：77606-60270）と位置を返す
+function findTail(raw, tail){
+  const chars = [...String(raw||'')], c = chars.map(x => hyph(toHalf(x)).toUpperCase()).join('');
+  if([...c].length !== chars.length) return null;
+  const m = new RegExp('-\\s*' + tail.slice(1)).exec(c); if(!m) return null;
+  let st = m.index; while(st > 0 && /[0-9A-Z]/.test(c[st-1]) && m.index - st < 5) st--;   // ハイフンの前の数字も記録用に含める
+  const e = m.index + m[0].length;
+  return {seg: chars.slice(st, e).join(''), pos: m.index + 1, end: e};
 }
 // 照合に使う社内品番の候補（外したもの → Tだけ外したもの → 読んだまま の順に探す）と、外した内容の説明
 function hinCands(orig){
@@ -578,19 +598,26 @@ function onScan(raw){
         return fail('社内かんばんの品番が見つかりません', `社内かんばんのQRに品番がありません（読取内容：${raw.slice(0,40)}）`, {hin:'', inner:raw.slice(0,40), kind:'社内品番なし', raw:cur.raw});
       }
       let hHit = null, hNote = '';
-      if(useHin) for(const c of hinCands(fi.hin)){ const h = findIn(cur.raw, c.hin); if(h){ hHit = h; hNote = c.note; break; } }
-      if(hHit && fi.tPre && !hNote.includes('「T」')) hNote = [hNote, 'ハイフン前の「T」'].filter(Boolean).join('と');
+      const tail = partMode() === 'tail' ? tailOf(fi.csv ? fi.hin : (fi.hin || raw)) : '';
+      if(useHin && partMode() === 'tail'){
+        // ハイフンと後ろ5桁だけで照合（ハイフンより前は使わない）
+        if(!tail) return fail('社内かんばんの品番が見つかりません', `社内品番にハイフンと後ろ5桁がありません（読取内容：${raw.slice(0,40)}）`, {hin:'', inner:raw.slice(0,40), kind:'社内品番なし', raw:cur.raw});
+        hHit = findTail(cur.raw, tail); hNote = '';
+      }
+      else if(useHin) for(const c of hinCands(fi.hin)){ const h = findIn(cur.raw, c.hin); if(h){ hHit = h; hNote = c.note; break; } }
+      if(hHit && !tail && fi.tPre && !hNote.includes('「T」')) hNote = [hNote, 'ハイフン前の「T」'].filter(Boolean).join('と');
       const sHit = useSeb ? findIn(cur.raw, fi.seb) : null;
       const inner = fi.hin || fi.seb;
       if(useHin && !hHit){
-        fail('品番不一致（誤品の可能性）', `社内品番「${fi.hin}」${sebTxt ? `（${sebTxt}）` : ''}が、客先かんばんのQRの中にありません`, {hin:'', inner, kind:'品番不一致', raw:cur.raw});
+        fail('品番不一致（誤品の可能性）', `社内品番「${fi.hin}」${tail ? `の「${tail}」` : ''}${sebTxt ? `（${sebTxt}）` : ''}が、客先かんばんのQRの中にありません`, {hin:'', inner, kind:'品番不一致', raw:cur.raw});
       }else if(useSeb && !sHit){
         fail('背番号不一致（誤品の可能性）', `社内かんばんの${sebTxt}が、客先かんばんのQRの中にありません` + (hHit ? '（品番は一致）' : ''), {hin:'', inner, kind:'背番号不一致', raw:cur.raw});
       }else{
         cur.hin = hHit ? hHit.seg : sHit.seg;
         readC[cur.key] = now(); LS.set('readC', readC);
-        addLog(cur.hin, inner, 'OK', cur.raw, [
-          hHit ? `品番：客先QRの${hHit.pos}～${hHit.end}文字目に一致` : '',
+        const selM = currentMaker();
+        addLog(cur.hin, inner, 'OK', cur.raw, [selM ? 'メーカー:' + selM.name : '',
+          hHit ? (tail ? `品番（ハイフンと後ろ5桁「${tail}」）：客先QRの${hHit.pos}～${hHit.end}文字目に一致` : `品番：客先QRの${hHit.pos}～${hHit.end}文字目に一致`) : '',
           sHit ? `背番号${fi.seb}：客先QRの${sHit.pos}～${sHit.end}文字目に一致` : (fi.seb ? `背番号${fi.seb}（照合なし）` : ''),
           hNote ? `社内品番の${hNote}を外して照合` : '',
           cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
@@ -602,7 +629,9 @@ function onScan(raw){
     const ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
     const a = norm(cur.hin);
     const eq = b => cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
-    let match = hinCands(ihin).some(c => eq(norm(c.hin)));
+    let match = partMode() === 'tail'
+      ? (!!tailOf(ihin) && tailOf(ihin) === tailOf(cur.hin))      // ハイフンと後ろ5桁どうしを比べる
+      : hinCands(ihin).some(c => eq(norm(c.hin)));
     if(match){
       readC[cur.key] = now(); LS.set('readC', readC);
       addLog(cur.hin, ihin, 'OK', cur.raw, [cur.maker ? 'メーカー:'+cur.maker : '', cur.makerNote||'',
@@ -1040,16 +1069,21 @@ function makers(){
 }
 function makerReady(m){ return [m.cS,m.cE,m.iS,m.iE].every(v=>Number(v)>=1) && m.cE>=m.cS && m.iE>=m.iS; }
 function currentMaker(){
+  if(howMode() === 'contain') return Number.isInteger(cfg.selMaker) ? (makers()[cfg.selMaker] || null) : null;   // 押したボタンのメーカー
   const p = posFromCfg();
   return makers().find(m => makerReady(m) && m.cS==p.cS && m.cE==p.cE && m.iS==p.iS && m.iE==p.iE) || null;
 }
 function renderMakerBtns(){
   const curM = currentMaker();
   document.getElementById('makerBtns').innerHTML = makers().map((m,i)=>
-    `<button type="button" class="${makerReady(m)?(curM===m?'on':''):'empty'}" style="background:${MAKER_COLORS[i%MAKER_COLORS.length]}" onclick="applyMaker(${i})">${curM===m?'✓ ':''}${String(m.name).replace(/[&<>"]/g,'')}</button>`).join('');
+    `<button type="button" class="${(makerReady(m) || howMode()==='contain')?(curM===m?'on':''):'empty'}" style="background:${MAKER_COLORS[i%MAKER_COLORS.length]}" onclick="applyMaker(${i})">${curM===m?'✓ ':''}${String(m.name).replace(/[&<>"]/g,'')}</button>`).join('');
 }
 function applyMaker(i){
   const m = makers()[i];
+  cfg.selMaker = i;
+  if(howMode() === 'contain' && !makerReady(m)){   // 入っていればOK：位置は使わないので、選ぶだけで完了
+    LS.set('cfg', cfg); cur = null; renderSteps(); renderPosSummary(); togglePos(false); sound('read'); return;
+  }
   if(!makerReady(m)){ alert(`「${m.name}」の位置がまだ登録されていません。\n担当者が ⚙設定 の「よく使う客先かんばん」で数値を登録してください。`); return; }
   document.getElementById('pcS').value = m.cS; document.getElementById('pcE').value = m.cE;
   document.getElementById('piS').value = m.iS; document.getElementById('piE').value = m.iE;
@@ -1060,6 +1094,7 @@ function renderMakerTbl(){
     const v = x => (x==null ? '' : x);
     return `<div class="mkRow" style="border-left:8px solid ${MAKER_COLORS[i%MAKER_COLORS.length]}">
       <input class="mkName" id="mkN${i}" value="${String(m.name).replace(/"/g,'&quot;')}" placeholder="メーカー名">
+      <label style="display:block;margin:6px 0;font-size:15px;font-weight:700"><input type="checkbox" id="mkT${i}" ${makerTail(m)?'checked':''} style="width:22px;height:22px;vertical-align:middle"> 社内品番は「－（ハイフン）と後ろ5桁」で照合する</label>
       <div class="mkPos">
         <span>客先 <input id="mkCS${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.cS)}">～<input id="mkCE${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.cE)}">文字目</span>
         <span>社内 <input id="mkIS${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.iS)}">～<input id="mkIE${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.iE)}">文字目</span>
@@ -1192,7 +1227,7 @@ function readMakerTbl(){   // 設定画面の表を読み取る。不正なら n
     const g = id => document.getElementById(id+i).value.trim();
     const name = g('mkN') || makers()[i].name;
     const nums = ['mkCS','mkCE','mkIS','mkIE'].map(g);
-    const smp = {samples:(mkWork[i] && mkWork[i].samples)||[], iSample:(mkWork[i] && mkWork[i].iSample)||''};
+    const smp = {samples:(mkWork[i] && mkWork[i].samples)||[], iSample:(mkWork[i] && mkWork[i].iSample)||'', tail:document.getElementById('mkT'+i).checked};
     if(nums.every(x=>x==='')){
       if(smp.samples.length){ alert(`「${name}」は見本QRがあるので、抜き取り位置の数値も入れてください。`); return null; }
       out.push(Object.assign({name, cS:null, cE:null, iS:null, iE:null}, smp)); continue;
@@ -1206,7 +1241,12 @@ function readMakerTbl(){   // 設定画面の表を読み取る。不正なら n
   return out;
 }
 function renderPosSummary(){
-  const p = posFromCfg(), m = currentMaker();
+  const p = posFromCfg(), m = currentMaker(), bt = document.getElementById('posToggle');
+  if(bt){
+    const i = m ? makers().indexOf(m) : -1;
+    bt.textContent = m ? `メーカー：${m.name}（${makerTail(m) ? '－と5桁で照合' : '品番全体で照合'}）` : 'メーカー選択（未選択：品番全体で照合）';
+    bt.style.background = m ? MAKER_COLORS[i % MAKER_COLORS.length] : ''; bt.style.color = m ? '#fff' : '';
+  }
   document.getElementById('posSummary').innerHTML = (m ? `<b>【${String(m.name).replace(/[&<>"]/g,'')}】</b>` : '') +
     `客先：<b>${p.cS}～${Math.min(300,p.cE)}</b>文字目　／　社内：<b>${p.iS}～${Math.min(300,p.iE)}</b>文字目`;
 }
