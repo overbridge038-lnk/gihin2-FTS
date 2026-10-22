@@ -365,6 +365,12 @@ function tailOf(s){
   const m = t.match(/-\s*([0-9A-Z]{5})(?![0-9A-Z])/) || t.match(/-\s*([0-9A-Z]{5})/);
   return m ? '-' + m[1] : '';
 }
+// 従来の方法（抜き取り位置）用：抜き取った文字から「後ろ5桁」を取り出す。
+// ハイフンがあればその後ろ5桁、なければ（例：35091、7760635091）末尾の5桁を使う
+function key5(s){
+  const t = tailOf(s); if(t) return t.slice(1);
+  const n = norm(s); return n.length >= 5 ? n.slice(-5) : '';
+}
 // 客先QRの中から「-60270」を探す。見つかったら、その品番のまとまり（例：77606-60270）と位置を返す
 function findTail(raw, tail){
   const chars = [...String(raw||'')], c = chars.map(x => hyph(toHalf(x)).toUpperCase()).join('');
@@ -630,7 +636,7 @@ function onScan(raw){
     const a = norm(cur.hin);
     const eq = b => cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
     let match = partMode() === 'tail'
-      ? (!!tailOf(ihin) && tailOf(ihin) === tailOf(cur.hin))      // ハイフンと後ろ5桁どうしを比べる
+      ? (!!key5(ihin) && key5(ihin) === key5(cur.hin))      // ハイフンの後ろ5桁どうしを比べる（抜き取った文字にハイフンがなくてもよい）
       : hinCands(ihin).some(c => eq(norm(c.hin)));
     if(match){
       readC[cur.key] = now(); LS.set('readC', readC);
