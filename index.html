@@ -1074,15 +1074,20 @@ function makers(){
   return cfg.makers;
 }
 function makerReady(m){ return [m.cS,m.cE,m.iS,m.iE].every(v=>Number(v)>=1) && m.cE>=m.cS && m.iE>=m.iS; }
+// 選んでいるメーカー：押したボタンを覚えておく（同じ位置のメーカーが2つあっても、押した方になる）
+function samePos(m, p){ return makerReady(m) && m.cS==p.cS && m.cE==p.cE && m.iS==p.iS && m.iE==p.iE; }
 function currentMaker(){
-  if(howMode() === 'contain') return Number.isInteger(cfg.selMaker) ? (makers()[cfg.selMaker] || null) : null;   // 押したボタンのメーカー
+  const sel = Number.isInteger(cfg.selMaker) ? (makers()[cfg.selMaker] || null) : null;
+  if(howMode() === 'contain') return sel;
   const p = posFromCfg();
-  return makers().find(m => makerReady(m) && m.cS==p.cS && m.cE==p.cE && m.iS==p.iS && m.iE==p.iE) || null;
+  // 従来の方法：押したメーカーの位置のままならそのメーカー。位置未登録のメーカーも選べる
+  if(sel && (!makerReady(sel) || samePos(sel, p))) return sel;
+  return makers().find(m => samePos(m, p)) || null;      // ＋－で位置を変えたときは、位置が同じメーカー（なければ未選択）
 }
 function renderMakerBtns(){
   const curM = currentMaker();
   document.getElementById('makerBtns').innerHTML = makers().map((m,i)=>
-    `<button type="button" class="${(makerReady(m) || howMode()==='contain')?(curM===m?'on':''):'empty'}" style="background:${MAKER_COLORS[i%MAKER_COLORS.length]}" onclick="applyMaker(${i})">${curM===m?'✓ ':''}${String(m.name).replace(/[&<>"]/g,'')}</button>`).join('');
+    `<button type="button" class="${curM===m?'on':''}" style="background:${MAKER_COLORS[i%MAKER_COLORS.length]}" onclick="applyMaker(${i})">${curM===m?'✓ ':''}${String(m.name).replace(/[&<>"]/g,'')}</button>`).join('');
 }
 function applyMaker(i){
   const m = makers()[i];
@@ -1090,7 +1095,11 @@ function applyMaker(i){
   if(howMode() === 'contain' && !makerReady(m)){   // 入っていればOK：位置は使わないので、選ぶだけで完了
     LS.set('cfg', cfg); cur = null; renderSteps(); renderPosSummary(); togglePos(false); sound('read'); return;
   }
-  if(!makerReady(m)){ alert(`「${m.name}」の位置がまだ登録されていません。\n担当者が ⚙設定 の「よく使う客先かんばん」で数値を登録してください。`); return; }
+  if(!makerReady(m)){   // 従来の方法で位置が未登録：メーカーだけ選び、抜き取り位置は今のまま
+    LS.set('cfg', cfg); cur = null; renderSteps(); renderPosSummary(); togglePos(false); sound('read');
+    alert(`「${m.name}」を選びました。\n抜き取り位置が未登録なので、今の位置のまま照合します。\n位置を固定したいときは、担当者が ⚙設定 の「よく使う客先かんばん」で数値を登録してください。`);
+    return;
+  }
   document.getElementById('pcS').value = m.cS; document.getElementById('pcE').value = m.cE;
   document.getElementById('piS').value = m.iS; document.getElementById('piE').value = m.iE;
   savePos();   // 入れたらそのまま保存して完了
@@ -1218,6 +1227,7 @@ function keyPositions(A, B){
   return Object.keys(fa).filter(i => i in fb && fa[i] !== fb[i]).map(i=>Number(i)+1);
 }
 function applyMakerPos(m){
+  cfg.selMaker = makers().indexOf(m);
   if(cfg.cPs===m.cS && cfg.cPl===m.cE-m.cS+1 && cfg.iPs===m.iS && cfg.iPl===m.iE-m.iS+1) return;
   cfg.cPs = m.cS; cfg.cPl = m.cE - m.cS + 1; cfg.iPs = m.iS; cfg.iPl = m.iE - m.iS + 1;
   LS.set('cfg', cfg); renderPosSummary();
