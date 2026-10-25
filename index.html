@@ -359,7 +359,7 @@ function stripHead(s){
 /* ---------- FTS プロテクター方式（客先・社内とも同じ形のQR） ----------
    QRの中の決まった目印で照合する部位を取り出す（かんばんごとに文字数が1つずれることがあるので、位置ではなく形で探す）
    ・品番：「P」の後ろ、「Q」の前（客先 77606-60290 ／ 社内 S7606T-60290）→ ハイフンと後ろ5桁「-60290」で照合
-   ・管理コード：8桁の数字のすぐ後ろ（例：A27-9、H41-2）→ 客先と社内で一致すること
+   ・管理コード（8桁の数字のすぐ後ろ、例：A27-9）は照合に使わない
    ・社内かんばんは品番のハイフンの前に「T」が付く（S7606T-、G9611T-）。客先かんばんには付かない → 読み順・取り違えの見分けに使う */
 function ftspFields(raw){
   const t = hyph(toHalf(String(raw||''))).toUpperCase();
@@ -574,11 +574,11 @@ function onScan(raw){
       cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); sound('read'); return;
     }
     if(ftspActive()){
-      // FTS プロテクター方式：QRの形で品番と管理コードを取り出す（抜き取り位置・メーカー判定は使わない）
+      // FTS プロテクター方式：QRの形で品番を取り出す（抜き取り位置・メーカー判定は使わない）
       const f = ftspFields(raw);
-      if(f.part && f.code && f.inner){ imeWarn('これは社内かんばんです。① 客先かんばんから読んでください'); sound('ng'); return; }
-      if(!f.part || !f.code){
-        return fail('FTS プロテクターの客先かんばんではありません', `品番または管理コードが見つかりません。メーカー選択が合っているか確認してください（読取内容：${raw.slice(0,40)}…）`, {hin:'', kind:'QRの形が違う', raw});
+      if(f.part && f.inner){ imeWarn('これは社内かんばんです。① 客先かんばんから読んでください'); sound('ng'); return; }
+      if(!f.part){
+        return fail('FTS プロテクターの客先かんばんではありません', `品番が見つかりません。メーカー選択が合っているか確認してください（読取内容：${raw.slice(0,40)}…）`, {hin:'', kind:'QRの形が違う', raw});
       }
       if(readC[key]) return fail('同じ客先かんばんを2回読み取りました', `品番 ${f.part}　／　前回の読取：${readC[key]}`, {hin:f.part, kind:'かんばん重複', raw});
       cur = { raw, hin:f.part, key, maker:'', makerNote:'', ftsp:true }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
@@ -619,25 +619,23 @@ function onScan(raw){
     // ② 社内かんばん
     if(cur.recheck && raw.trim() === cur.key){ sound('read'); return; }   // 再照合中に同じ客先かんばんを読み直しても、そのまま②を待つ
     if(cur.ftsp){
-      // FTS プロテクター方式：品番のハイフンと後ろ5桁、管理コードの2か所がどちらも一致したらOK
+      // FTS プロテクター方式：品番のハイフンと後ろ5桁が一致したらOK（① 客先 → ② 社内 の順）
       lastRaw.i = raw; LS.set('lastRaw', lastRaw);
       const c = ftspFields(cur.raw), f = ftspFields(raw);
-      if(!f.part || !f.code){
-        return fail('FTS プロテクターの社内かんばんではありません', `品番または管理コードが見つかりません（読取内容：${raw.slice(0,40)}…）`, {hin:c.part, inner:raw.slice(0,40), kind:'品番不一致', raw:cur.raw});
+      if(!f.part){
+        return fail('FTS プロテクターの社内かんばんではありません', `品番が見つかりません（読取内容：${raw.slice(0,40)}…）`, {hin:c.part, inner:raw.slice(0,40), kind:'品番不一致', raw:cur.raw});
       }
       if(!f.inner){
         return fail('社内かんばんではありません', `読んだのは客先かんばん（品番 ${f.part}）のようです。社内かんばんを読んでください`, {hin:c.part, inner:f.part, kind:'品番不一致', raw:cur.raw});
       }
-      const okTail = f.tail === c.tail, okCode = f.code === c.code;
-      if(!okTail || !okCode){
-        const why = [!okTail ? `品番の後ろ5桁：客先「${c.tail}」／社内「${f.tail}」` : '', !okCode ? `管理コード：客先「${c.code}」／社内「${f.code}」` : ''].filter(Boolean).join('　');
-        return fail(!okTail ? '品番不一致（誤品の可能性）' : '管理コード不一致（誤品の可能性）', `${why}（客先 ${c.part}／社内 ${f.part}）`, {hin:c.part, inner:f.part, kind:'品番不一致', raw:cur.raw});
+      if(f.tail !== c.tail){
+        return fail('品番不一致（誤品の可能性）', `品番のハイフンと後ろ5桁：客先「${c.tail}」／社内「${f.tail}」（客先 ${c.part}／社内 ${f.part}）`, {hin:c.part, inner:f.part, kind:'品番不一致', raw:cur.raw});
       }
       readC[cur.key] = now(); LS.set('readC', readC);
       const selM = currentMaker();
-      addLog(c.part, f.part, 'OK', cur.raw, [selM ? 'メーカー:' + selM.name : '', `FTSプロテクター方式：品番の後ろ5桁「${c.tail}」一致 / 管理コード「${c.code}」一致`,
+      addLog(c.part, f.part, 'OK', cur.raw, [selM ? 'メーカー:' + selM.name : '', `FTSプロテクター方式：品番のハイフンと後ろ5桁「${c.tail}」一致`,
         cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
-      showOk(`${c.tail.slice(1)}・${c.code}`);
+      showOk(c.tail);
       cur = null; recheck = null; LS.set('recheck', null); renderSteps(); beep(true);
       return;
     }
@@ -751,7 +749,7 @@ function renderSteps(){
   const s1 = document.getElementById('s1'), s2 = document.getElementById('s2');
   if(cur){
     s1.className='step done'; s2.className='step active';
-    document.getElementById('s1v').textContent = cur.ftsp ? (f => `${f.part}（管理コード ${f.code}）`)(ftspFields(cur.raw)) : cur.whole ? `QR全文で照合（${[...cur.raw].length}文字）` : cur.hin;
+    document.getElementById('s1v').textContent = cur.ftsp ? ftspFields(cur.raw).part : cur.whole ? `QR全文で照合（${[...cur.raw].length}文字）` : cur.hin;
     document.getElementById('s1e').textContent = (cur.recheck ? 'NG後の再照合' : '読取OK') + (cur.maker ? `【${cur.maker}】` : '') + (cur.makerNote ? '（メーカー判定不可）' : '');
     document.getElementById('guide').textContent = cur.recheck
       ? 'NGのやり直し：正しい社内かんばんを読み取ってください'
@@ -1158,7 +1156,7 @@ function renderMakerTbl(){
     const v = x => (x==null ? '' : x);
     return `<div class="mkRow" style="border-left:8px solid ${MAKER_COLORS[i%MAKER_COLORS.length]}">
       <input class="mkName" id="mkN${i}" value="${String(m.name).replace(/"/g,'&quot;')}" placeholder="メーカー名">
-      <label style="display:block;margin:6px 0;font-size:15px;font-weight:700">照合方式 <select id="mkR${i}" style="font-size:15px"><option value="std" ${makerRule(m)==='std'?'selected':''}>標準</option><option value="ftsp" ${makerRule(m)==='ftsp'?'selected':''}>FTS プロテクター方式（品番後ろ5桁＋管理コード）</option></select></label>
+      <label style="display:block;margin:6px 0;font-size:15px;font-weight:700">照合方式 <select id="mkR${i}" style="font-size:15px"><option value="std" ${makerRule(m)==='std'?'selected':''}>標準</option><option value="ftsp" ${makerRule(m)==='ftsp'?'selected':''}>FTS プロテクター方式（QRの品番欄の－と5桁）</option></select></label>
       <label style="display:block;margin:6px 0;font-size:15px;font-weight:700"><input type="checkbox" id="mkT${i}" ${makerTail(m)?'checked':''} style="width:22px;height:22px;vertical-align:middle"> 社内品番は「－（ハイフン）と後ろ5桁」で照合する</label>
       <div class="mkPos">
         <span>客先 <input id="mkCS${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.cS)}">～<input id="mkCE${i}" oninput="renderSampleInfo(${i})" type="number" inputmode="numeric" min="1" max="300" value="${v(m.cE)}">文字目</span>
@@ -1310,7 +1308,7 @@ function renderPosSummary(){
   const p = posFromCfg(), m = currentMaker(), bt = document.getElementById('posToggle');
   if(bt){
     const i = m ? makers().indexOf(m) : -1;
-    bt.textContent = m ? `メーカー：${m.name}（${makerRule(m)==='ftsp' ? '品番後ろ5桁＋管理コードで照合' : makerTail(m) ? '－と5桁で照合' : '品番全体で照合'}）` : 'メーカー選択（未選択：品番全体で照合）';
+    bt.textContent = m ? `メーカー：${m.name}（${makerRule(m)==='ftsp' ? '－と5桁で照合' : makerTail(m) ? '－と5桁で照合' : '品番全体で照合'}）` : 'メーカー選択（未選択：品番全体で照合）';
     bt.style.background = m ? MAKER_COLORS[i % MAKER_COLORS.length] : ''; bt.style.color = m ? '#fff' : '';
   }
   document.getElementById('posSummary').innerHTML = (m ? `<b>【${String(m.name).replace(/[&<>"]/g,'')}】</b>` : '') +
