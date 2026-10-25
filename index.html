@@ -665,7 +665,12 @@ function onScan(raw){
       }
       return;
     }
-    const ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
+    let ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
+    if(partMode() === 'tail'){
+      // 社内かんばんが「AAA,12345-67890,8」の形なら、位置に関係なく2つ目の項目を品番として使う
+      const f = hyph(toHalf(raw)).replace(/[、，]/g, ',').split(',').map(x => x.trim());
+      if(f.length >= 3 && tailOf(f[1])) ihin = f[1];
+    }
     const a = norm(cur.hin);
     const eq = b => cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
     let match = partMode() === 'tail'
