@@ -692,7 +692,7 @@ function fail(title, detail, rec){
                      cur && cur.recheck ? `再照合でもNG（前回NG 通し番号 ${cur.ngNo}）` : '');
   // 品番不一致のときは客先かんばんを覚えておき、解除後に正規の社内かんばんで再照合させる
   if((rec.kind === '品番不一致' || rec.kind === '背番号不一致') && cur){
-    recheck = { raw:cur.raw, hin:cur.hin, key:cur.key, whole:!!cur.whole, ftsp:!!cur.ftsp, ngNo:log.no };
+    recheck = { raw:cur.raw, hin:cur.hin, key:cur.key, whole:!!cur.whole, ftsp:!!cur.ftsp, ngNo:log.no, mk:cfg.selMaker };
     LS.set('recheck', recheck);
   }
   cur = null; renderSteps();
@@ -724,6 +724,7 @@ function tryUnlock(){
   if(v === toHalf(String(cfg.pw)).trim()){
     locked = false; clearInterval(lock.t); LS.set('lockState', null);
     document.getElementById('lock').classList.remove('show');
+    dropStaleRecheck();
     if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); }   // NGの客先かんばんはそのまま。正規の社内かんばんを待つ
     lastScan = {v:'', t:0};
     renderSteps();
@@ -1114,6 +1115,10 @@ function makers(){
 function makerReady(m){ return [m.cS,m.cE,m.iS,m.iE].every(v=>Number(v)>=1) && m.cE>=m.cS && m.iE>=m.iS; }
 // 選んでいるメーカー：押したボタンを覚えておく（同じ位置のメーカーが2つあっても、押した方になる）
 function samePos(m, p){ return makerReady(m) && m.cS==p.cS && m.cE==p.cE && m.iS==p.iS && m.iE==p.iE; }
+// NG後の再照合待ちは、NGになったときと別のメーカーに切り替えたら取り消す（別方式で判定されるのを防ぐ）
+function dropStaleRecheck(){
+  if(recheck && recheck.mk !== cfg.selMaker){ recheck = null; LS.set('recheck', null); cur = null; }
+}
 function currentMaker(){
   const sel = Number.isInteger(cfg.selMaker) ? (makers()[cfg.selMaker] || null) : null;
   if(howMode() === 'contain') return sel;
@@ -1129,7 +1134,7 @@ function renderMakerBtns(){
 }
 function applyMaker(i){
   const m = makers()[i];
-  cfg.selMaker = i;
+  cfg.selMaker = i; dropStaleRecheck();
   if(howMode() === 'contain' && !makerReady(m)){   // 入っていればOK：位置は使わないので、選ぶだけで完了
     LS.set('cfg', cfg); cur = null; renderSteps(); renderPosSummary(); togglePos(false); sound('read'); return;
   }
@@ -1352,7 +1357,7 @@ function startWork(){
 renderSteps(); renderPosSummary(); renderDev(); initRecords();
 // 画面を開き直してもNGロックは解除されない。再照合待ちも引き継ぐ
 (function restoreState(){
-  recheck = LS.get('recheck', null);
+  recheck = LS.get('recheck', null); dropStaleRecheck();
   const lk = LS.get('lockState', null);
   if(lk){ lock(lk.title, lk.detail); return; }
   if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); }
