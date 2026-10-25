@@ -1304,7 +1304,7 @@ function renderPosSummary(){
   const p = posFromCfg(), m = currentMaker(), bt = document.getElementById('posToggle');
   if(bt){
     const i = m ? makers().indexOf(m) : -1;
-    bt.textContent = m ? `メーカー：${m.name}（${makerRule(m)==='ftsp' ? '－と5桁で照合' : makerTail(m) ? '－と5桁で照合' : '品番全体で照合'}）` : 'メーカー選択（未選択：品番全体で照合）';
+    bt.textContent = m ? `メーカー：${m.name}（${makerRule(m)==='ftsp' ? 'プロテクター方式' : makerTail(m) ? '－と後ろ5桁で照合' : '品番全体で照合'}）` : 'メーカー選択（未選択：品番全体で照合）';
     bt.style.background = m ? MAKER_COLORS[i % MAKER_COLORS.length] : ''; bt.style.color = m ? '#fff' : '';
   }
   document.getElementById('posSummary').innerHTML = (m ? `<b>【${String(m.name).replace(/[&<>"]/g,'')}】</b>` : '') +
