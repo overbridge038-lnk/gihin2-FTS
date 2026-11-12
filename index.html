@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 FTS版 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 FTS版 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.12-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
@@ -1069,7 +1069,12 @@ function setBusy(on){
   if(on){ if(!g.classList.contains('busy')){ g.classList.add('busy'); g.textContent = '読み取り中… 音が鳴るまで次を読まないでください'; } }
   else if(g.classList.contains('busy')){ g.classList.remove('busy'); renderSteps(); }
 }
-function scanTarget(){ const a = document.activeElement; return !a || a===document.body || a===inp; }
+// スキャナー入力として受け取ってよい状態か。照合画面では、ボタンにカーソルが残っていても受け取って読取欄へ戻す
+function scanTarget(){
+  const a = document.activeElement;
+  if(!a || a===document.body || a===inp) return true;
+  return a.tagName === 'BUTTON' && !document.getElementById('viewMain').classList.contains('hidden');
+}
 const CODE_MAP = {
   Digit1:['1','!'],Digit2:['2','@'],Digit3:['3','#'],Digit4:['4','$'],Digit5:['5','%'],
   Digit6:['6','^'],Digit7:['7','&'],Digit8:['8','*'],Digit9:['9','('],Digit0:['0',')'],
@@ -1136,8 +1141,21 @@ document.addEventListener('keydown', e=>{
   if(document.activeElement!==inp){ focusInput(); }        // 読取欄から外れていたら戻す（キー位置の記録で取りこぼしなし）
 });
 inp.addEventListener('input', ()=>{ scanLast = performance.now(); armFlush(); });
-function focusInput(){ if(cfg.mode==='scanner' && !locked && !document.getElementById('viewMain').classList.contains('hidden')) inp.focus(); }
-document.addEventListener('click', e=>{ if(!['INPUT','SELECT','BUTTON'].includes(e.target.tagName)) focusInput(); });
+function focusInput(){ if(cfg.mode==='scanner' && !locked && !capture && !document.getElementById('viewMain').classList.contains('hidden')) inp.focus({preventScroll:true}); }
+// カーソルは常に読取欄（①客先かんばん）に置く。入力中の欄（設定の数字など）がある間だけは取らない
+function keepFocus(){
+  const a = document.activeElement;
+  if(a === inp) return;
+  if(a && ['INPUT','SELECT','TEXTAREA'].includes(a.tagName)) return;   // 設定などで入力している最中
+  focusInput();                                                        // ボタンに残ったカーソルや、どこにもないカーソルを戻す
+}
+// ボタンを押したあと（Enterで押されてしまうのを防ぐ）、画面に戻ったとき、読取欄から外れたとき、1秒ごと
+document.addEventListener('click', e=>{ setTimeout(keepFocus, 0); });
+window.addEventListener('focus', ()=>setTimeout(keepFocus, 0));
+window.addEventListener('pageshow', ()=>setTimeout(keepFocus, 0));
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setTimeout(keepFocus, 0); });
+inp.addEventListener('blur', ()=>setTimeout(keepFocus, 50));
+setInterval(keepFocus, 1000);
 
 function setMode(m){
   cfg.mode = m; LS.set('cfg', cfg);
