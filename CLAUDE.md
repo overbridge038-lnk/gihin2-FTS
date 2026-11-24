@@ -23,6 +23,7 @@ Androidタブレットのブラウザ（Chrome）で動く。GitHub Pagesで公�
 - `sw.js`：サービスワーカー。一度ネットで開けば、電波がなくても起動する
   - ページ本体はネット優先（4秒で諦めて保存版を使う）、カメラ用ライブラリは保存版優先
 - 外部ライブラリはカメラ読取用の html5-qrcode 2.3.8（unpkg）だけ
+- `gas/Code.gs`：スプレッドシート受け取り用のGAS（Webアプリ）。設定手順は先頭のコメント。アプリの⚙設定「GASのコードをコピー」でも取れる
 - `manifest.webmanifest`・`icon-192.png`・`icon-512.png`：ホーム画面のアプリとして開くための設定（全画面。アドレスバーが出ないので、誤タップでURL欄にカーソルが移らない）
   - タブレットでは Chrome のメニュー（⋮）→「ホーム画面に追加」または「アプリをインストール」で入れ、ホーム画面のアイコンから開く
 
@@ -100,6 +101,24 @@ Androidタブレットのブラウザ（Chrome）で動く。GitHub Pagesで公�
 - NG後の再照合中に「読み直し」を押すと、管理者の解除番号を聞いて再照合をやめる（記録に「再照合の中止」が残る）
 - メーカーを切り替えると、NG後の再照合待ちは取り消す（別方式で判定されないように）
 - 関係する関数：`UNLOCK_STEPS_ALL`, `renderLockSteps`, `lockStepDone`, `lock`, `addUnlockLog`, `tryUnlock`, `abandonRecheck`, `renderTreat`, `csvTreat`
+
+## 画面・表示
+
+- 照合画面は上から ①②の状態と大きなガイド → 読取欄 → メーカーボタン → 件数 → 記録。送信・CSV保存は折りたたみ「📤 送信・CSV保存」の中
+- ヘッダーの未送信バッジ：未送信があれば「⚠️ 未送信データ: ○件」（橙→赤に点滅、ヘッダーの下に橙の線）。なければ緑「✓ 未送信なし」。GASを設定していればGAS基準、していなければGoogleドライブ基準で数える
+- OKのとき画面の縁が緑にフラッシュ（`okflash`）。NGのときはロック画面が赤く点滅（0.7秒）
+- 暗い表示：ヘッダーの 🌙／☀ で切り替え。`cfg.theme`（`dark`／`light`）に保存。初期値は明るい表示
+- ボタンは押し間違い防止のため大きめ（最低48px）
+
+## GAS連携（スプレッドシートへ直接送る）
+
+- ⚙設定「GAS連携」にWebアプリのURL（`https://script.google.com/macros/s/…/exec`）と、任意の合言葉を入れる。「接続テスト」あり
+- 「📊 未送信分をGASへ送る」：200件ずつ `fetch` でPOST（`Content-Type: text/plain`＝事前確認なし）。GASが返す `received`（受け取った件数）が送った件数と合ったときだけ、その分を送信済み（`lastSentGas`）にする。合わない・エラー・オフラインなら未送信のまま端末に残る
+- 送信済みの記録は端末から消さない（CSV・重複判定に使うため）。「送信済みフラグ」（通し番号）で二重送信を防ぐ。GAS側も `キー＝端末ID-通し番号` で同じ記録を1行にまとめる
+- Googleドライブ送信（`lastSentNo`）とGAS送信（`lastSentGas`）は別々に数える
+- 送る項目：key, dev（端末ID）, no, day, t（タイムスタンプ）, hin（客先品番）, inner（社内品番）, r（判定）, raw（客先QR全文）, note, treat（解除の記録）
+- 「未送信をJSON／CSVでコピー」はコピーするだけで、送信済みにはしない
+- 関係する関数：`sendToGas`, `gasPost`, `gasTest`, `recJson`, `copyUnsent`, `refreshSendState`
 
 ## 記録・CSV
 
